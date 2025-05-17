@@ -1,13 +1,507 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" class="transition-colors duration-300">
 <head>
-    <title>Visitor Clustering App</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visitor Clustering Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.24.1/plotly.min.js"></script>
 </head>
-<body>
-    <h1>Upload Tracking Reviews CSV</h1>
-    <form action="/" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" required><br><br>
-        <input type="submit" value="Process and Download">
-    </form>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-200">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-2">Visitor Clustering Dashboard</h1>
+                <p class="text-gray-600 dark:text-gray-400">Upload your tracking data to discover visitor segments and patterns</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 focus:outline-none">
+                    <!-- Sun icon -->
+                    <svg id="light-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <!-- Moon icon -->
+                    <svg id="dark-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-10 transition-colors duration-200" id="uploadSection">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">Upload Tracking Data</h2>
+            
+            <div id="uploadContainer" class="{% if plots %}hidden{% endif %}">
+                <form action="/" method="post" enctype="multipart/form-data" id="uploadForm" class="upload-form">
+                    <div class="upload-area rounded-xl p-8 text-center mb-6 border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 transition-colors duration-200">
+                        <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4h-8m-12 0H8m12 0a4 4 0 01-4-4v-4m32 0v-4a4 4 0 00-4-4h-4m-12 4h.01M16 20h.01" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="mt-4 flex text-sm text-gray-600 dark:text-gray-400 justify-center">
+                            <label for="file-upload" class="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 focus-within:outline-none">
+                                <span>Upload a CSV file</span>
+                                <input id="file-upload" name="file" type="file" class="sr-only" accept=".csv" required>
+                            </label>
+                            <p class="pl-1">or drag and drop</p>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">CSV files only</p>
+                    </div>
+                    <div class="flex justify-center">
+                        <button type="submit" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 shadow-md hover:shadow-lg transition-all duration-200">
+                            Process Data
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="loading flex-col items-center justify-center py-12 hidden">
+                    <div class="spinner mb-4"></div>
+                    <p class="text-gray-700 dark:text-gray-300 text-lg">Processing your data...</p>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mt-2">This may take a moment depending on the file size</p>
+                </div>
+            </div>
+        </div>
+
+        {% if plots %}
+        <div class="results">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Analysis Results</h2>
+                <button onclick="document.getElementById('uploadContainer').classList.remove('hidden')" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none transition-colors duration-200">
+                    Upload New File
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">PCA Visualization</h3>
+                    <div id="pca-plot" class="w-full h-64 md:h-80"></div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-3">Principal Component Analysis showing visitor clusters in 2D space</p>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Cluster Sizes</h3>
+                    <div id="cluster-sizes-plot" class="w-full h-64 md:h-80"></div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-3">Distribution of visitors across different clusters</p>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Elbow Method</h3>
+                    <div id="elbow-plot" class="w-full h-64 md:h-80"></div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-3">Elbow method used to determine the optimal number of clusters</p>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Download Results</h3>
+                    <div class="flex flex-col items-center justify-center h-full">
+                        <div class="text-center mb-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                            </svg>
+                            <p class="text-gray-600 dark:text-gray-400 mb-4">Download the complete clustering results as a CSV file</p>
+                        </div>
+                        <a href="{{ url_for('main.download_results') }}" class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium rounded-lg hover:from-green-600 hover:to-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-800 shadow-md hover:shadow-lg transition-all duration-200 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download CSV
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 transition-all duration-200 hover:shadow-xl">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-6">Cluster Profile Summary</h3>
+                
+                {% if summary['summary']|length > 0 %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead>
+                            <tr>
+                                {% for col in summary.summary[0].keys() %}
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-900 rounded-tl-lg rounded-tr-lg">
+                                    {{ col }}
+                                </th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            {% for row in summary.summary %}
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                                {% for col, value in row.items() %}
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {% if col == 'cluster' %}
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cluster-{{ value }} text-white">
+                                        Cluster {{ value }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-gray-700 dark:text-gray-300">{{ value }}</span>
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-gray-600 dark:text-gray-400">No summary data to display.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // // Theme toggle functionality
+            // const themeToggle = document.getElementById('theme-toggle');
+            // const lightIcon = document.getElementById('light-icon');
+            // const darkIcon = document.getElementById('dark-icon');
+            
+            // // Check for saved theme preference or use system preference
+            // const userTheme = localStorage.getItem('theme');
+            // const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            // //Initial theme setup
+            // if (userTheme === 'dark' || (!userTheme && systemTheme)) {
+            //     document.documentElement.classList.add('dark');
+            //     lightIcon.classList.remove('hidden');
+            //     darkIcon.classList.add('hidden');
+            // } else {
+            //     lightIcon.classList.add('hidden');
+            //     darkIcon.classList.remove('hidden');
+            // }
+            
+            // // Toggle theme
+            // themeToggle.addEventListener('click', () => {
+            //     document.documentElement.classList.toggle('dark');
+                
+            //     // Update icons
+            //     lightIcon.classList.toggle('hidden');
+            //     darkIcon.classList.toggle('hidden');
+                
+            //     // Save preference
+            //     if (document.documentElement.classList.contains('dark')) {
+            //         localStorage.setItem('theme', 'dark');
+            //     } else {
+            //         localStorage.setItem('theme', 'light');
+            //     }
+            // });
+
+            document.addEventListener('DOMContentLoaded', function() {
+                localStorage.setItem('theme','dark');
+                const themeToggleBtn = document.getElementById('theme-toggle');
+                const darkIcon = document.getElementById('dark-icon');
+                const lightIcon = document.getElementById('light-icon');
+
+                // Function to set the theme and icons
+                function setTheme(isDark) {
+                    if (isDark) {
+                        document.documentElement.classList.add('dark');
+                        localStorage.setItem('theme', 'dark');
+                        darkIcon.classList.add('hidden');
+                        lightIcon.classList.remove('hidden');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                        localStorage.setItem('theme', 'light');
+                        lightIcon.classList.add('hidden');
+                        darkIcon.classList.remove('hidden');
+                    }
+                }
+
+                // Initial theme setup
+                const storedTheme = localStorage.getItem('theme');
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                
+                if (storedTheme === 'dark' || (!storedTheme && systemDark)) {
+                    setTheme(true);
+                } else {
+                    setTheme(false);
+                }
+
+                // Toggle theme on click
+                themeToggleBtn.addEventListener('click', function() {
+                    const isDark = document.documentElement.classList.contains('dark');
+                    setTheme(!isDark);
+                    
+                    // Update charts if they exist
+                    if (typeof updateChartThemes === 'function') {
+                        updateChartThemes();
+                    }
+                });
+            });
+            
+            // File upload functionality
+            const form = document.getElementById('uploadForm');
+            const uploadArea = document.querySelector('.upload-area');
+            const fileInput = document.getElementById('file-upload');
+            const uploadContainer = document.getElementById('uploadContainer');
+            const loadingDiv = document.querySelector('.loading');
+            
+            // Drag and drop functionality
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                uploadArea.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+            }
+            
+            function unhighlight() {
+                uploadArea.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+            }
+            
+            uploadArea.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                fileInput.files = files;
+                
+                // Show file name
+                if (files[0]) {
+                    const fileNameElement = document.createElement('p');
+                    fileNameElement.textContent = `Selected file: ${files[0].name}`;
+                    fileNameElement.className = 'mt-4 text-sm font-medium text-blue-600 dark:text-blue-400';
+                    
+                    // Remove any existing file name display
+                    const existingFileName = uploadArea.querySelector('.selected-file-name');
+                    if (existingFileName) {
+                        existingFileName.remove();
+                    }
+                    
+                    fileNameElement.classList.add('selected-file-name');
+                    uploadArea.appendChild(fileNameElement);
+                }
+            }
+            
+            // Show file name when selected via button
+            fileInput.addEventListener('change', function() {
+                if (this.files[0]) {
+                    const fileNameElement = document.createElement('p');
+                    fileNameElement.textContent = `Selected file: ${this.files[0].name}`;
+                    fileNameElement.className = 'mt-4 text-sm font-medium text-blue-600 dark:text-blue-400';
+                    
+                    // Remove any existing file name display
+                    const existingFileName = uploadArea.querySelector('.selected-file-name');
+                    if (existingFileName) {
+                        existingFileName.remove();
+                    }
+                    
+                    fileNameElement.classList.add('selected-file-name');
+                    uploadArea.appendChild(fileNameElement);
+                }
+            });
+            
+            // Show loading spinner on form submit
+            form.addEventListener('submit', function() {
+                form.classList.add('hidden');
+                loadingDiv.classList.remove('hidden');
+            });
+
+            // Interactive charts
+            {% if plots %}
+                // PCA Plot
+                const pcaData = {{ pca_data|tojson }};
+                
+                const pcaColors = [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5'
+                ];
+                
+                const traces = [];
+                const clusters = [...new Set(pcaData.cluster)];
+                
+                clusters.forEach(cluster => {
+                    const clusterData = pcaData.data.filter(d => d.cluster === cluster);
+                    traces.push({
+                        x: clusterData.map(d => d.pca1),
+                        y: clusterData.map(d => d.pca2),
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: `Cluster ${cluster}`,
+                        marker: {
+                            color: pcaColors[cluster % pcaColors.length],
+                            size: 8
+                        }
+                    });
+                });
+                
+                const pcaLayout = {
+                    title: 'PCA of Visitor Clusters',
+                    xaxis: {
+                        title: 'PCA 1',
+                        zeroline: false
+                    },
+                    yaxis: {
+                        title: 'PCA 2',
+                        zeroline: false
+                    },
+                    hovermode: 'closest',
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: {
+                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                    },
+                    margin: {
+                        l: 50,
+                        r: 20,
+                        t: 50,
+                        b: 50
+                    }
+                };
+                
+                Plotly.newPlot('pca-plot', traces, pcaLayout, {responsive: true});
+                
+                // Cluster Sizes Plot
+                const clusterSizes = {{ cluster_sizes|tojson }};
+                
+                const clusterSizesData = [{
+                    x: clusterSizes.clusters,
+                    y: clusterSizes.sizes,
+                    type: 'bar',
+                    marker: {
+                        color: clusterSizes.clusters.map(c => pcaColors[c % pcaColors.length])
+                    }
+                }];
+                
+                const clusterSizesLayout = {
+                    title: 'Visitor Cluster Distribution',
+                    xaxis: {
+                        title: 'Cluster',
+                        tickmode: 'array',
+                        tickvals: clusterSizes.clusters,
+                        ticktext: clusterSizes.clusters.map(c => `Cluster ${c}`)
+                    },
+                    yaxis: {
+                        title: 'Number of Visitors'
+                    },
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: {
+                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                    },
+                    margin: {
+                        l: 50,
+                        r: 20,
+                        t: 50,
+                        b: 50
+                    }
+                };
+                
+                Plotly.newPlot('cluster-sizes-plot', clusterSizesData, clusterSizesLayout, {responsive: true});
+                
+                // Elbow Plot
+                const elbowData = {{ elbow_data|tojson }};
+                
+                const elbowPlotData = [{
+                    x: elbowData.k_values,
+                    y: elbowData.inertias,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: {
+                        color: '#3B82F6',
+                        width: 2
+                    },
+                    marker: {
+                        color: '#3B82F6',
+                        size: 8
+                    }
+                }];
+                
+                // Add a marker for the optimal k
+                elbowPlotData.push({
+                    x: [elbowData.optimal_k],
+                    y: [elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)]],
+                    type: 'scatter',
+                    mode: 'markers',
+                    marker: {
+                        color: '#EF4444',
+                        size: 12,
+                        symbol: 'circle',
+                        line: {
+                            color: '#FFFFFF',
+                            width: 2
+                        }
+                    },
+                    name: 'Optimal K'
+                });
+                
+                const elbowLayout = {
+                    title: 'Elbow Method For Optimal k',
+                    xaxis: {
+                        title: 'Number of clusters',
+                        tickmode: 'array',
+                        tickvals: elbowData.k_values
+                    },
+                    yaxis: {
+                        title: 'SSE (Sum of Squared Errors)'
+                    },
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: {
+                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                    },
+                    margin: {
+                        l: 50,
+                        r: 20,
+                        t: 50,
+                        b: 50
+                    },
+                    annotations: [{
+                        x: elbowData.optimal_k,
+                        y: elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)],
+                        xref: 'x',
+                        yref: 'y',
+                        text: 'Optimal K = ' + elbowData.optimal_k,
+                        showarrow: true,
+                        arrowhead: 2,
+                        ax: 0,
+                        ay: -40
+                    }]
+                };
+                
+                Plotly.newPlot('elbow-plot', elbowPlotData, elbowLayout, {responsive: true});
+                
+                // Update plots when theme changes
+                themeToggle.addEventListener('click', () => {
+                    const textColor = document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151';
+                    
+                    Plotly.relayout('pca-plot', {
+                        'font.color': textColor,
+                        'paper_bgcolor': 'rgba(0,0,0,0)',
+                        'plot_bgcolor': 'rgba(0,0,0,0)'
+                    });
+                    
+                    Plotly.relayout('cluster-sizes-plot', {
+                        'font.color': textColor,
+                        'paper_bgcolor': 'rgba(0,0,0,0)',
+                        'plot_bgcolor': 'rgba(0,0,0,0)'
+                    });
+                    
+                    Plotly.relayout('elbow-plot', {
+                        'font.color': textColor,
+                        'paper_bgcolor': 'rgba(0,0,0,0)',
+                        'plot_bgcolor': 'rgba(0,0,0,0)'
+                    });
+                });
+            {% endif %}
+        });
+    </script>
 </body>
 </html>

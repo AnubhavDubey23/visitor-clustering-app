@@ -7,3 +7,4 @@ __pycache__/
 venv/
 outputs/
 .DS_Store
+static/plots/

@@ -1,7 +1,5 @@
 from flask import Blueprint, render_template, request, send_file, jsonify
 import pandas as pd
-import numpy as np
-import json
 import os
 from .utils import process_file
 
@@ -16,90 +14,127 @@ def index():
             filepath = os.path.join('uploaded.csv')
             file.save(filepath)
             summary = process_file(filepath)
-            
-            # Extract PCA data for interactive visualization
+
             APP_FOLDER = os.path.dirname(os.path.abspath(__file__))
-            output_path = os.path.join(APP_FOLDER, 'outputs', 'clustered_visitors_final.csv')
-            
+            output_path = os.path.join(APP_FOLDER, 'outputs', 'clustered_visitors_combined.csv')
+
             if os.path.exists(output_path):
                 df = pd.read_csv(output_path)
+
+                # PCA data
                 pca_data = {
-                    'data': df[['pca1', 'pca2', 'cluster']].to_dict('records'),
-                    'cluster': df['cluster'].unique().tolist()
+                    'kmeans': df[['pca1', 'pca2', 'kmeans_cluster']].rename(
+                        columns={'pca1': 'x', 'pca2': 'y', 'kmeans_cluster': 'cluster'}
+                    ).to_dict('records'),
+                    'hdbscan': df[df['hdbscan_cluster'] != -1][['pca1', 'pca2', 'hdbscan_cluster']].rename(
+                        columns={'pca1': 'x', 'pca2': 'y', 'hdbscan_cluster': 'cluster'}
+                    ).to_dict('records'),
                 }
-                
-                # Extract cluster sizes data
-                cluster_counts = df['cluster'].value_counts().sort_index()
+
+                # Cluster sizes
                 cluster_sizes = {
-                    'clusters': cluster_counts.index.tolist(),
-                    'sizes': cluster_counts.values.tolist()
+                    'kmeans': {
+                        'clusters': [],
+                        'sizes': []
+                    },
+                    'hdbscan': {
+                        'clusters': [],
+                        'sizes': []
+                    }
                 }
-                
-                # Extract elbow data from the summary
-                # Extract elbow data from the summary
+
+                if 'kmeans_cluster' in df.columns:
+                    kmeans_counts = df['kmeans_cluster'].value_counts().sort_index()
+                    cluster_sizes['kmeans']['clusters'] = kmeans_counts.index.tolist()
+                    cluster_sizes['kmeans']['sizes'] = kmeans_counts.values.tolist()
+
+                if 'hdbscan_cluster' in df.columns:
+                    hdbscan_counts = df[df['hdbscan_cluster'] != -1]['hdbscan_cluster'].value_counts().sort_index()
+                    cluster_sizes['hdbscan']['clusters'] = hdbscan_counts.index.tolist()
+                    cluster_sizes['hdbscan']['sizes'] = hdbscan_counts.values.tolist()
+
                 elbow_data = {
                     'k_values': list(range(1, 11)),
-                    'inertias': [float(x) for x in summary.get('inertias', [...])],
+                    'inertias': [float(x) for x in summary.get('inertias', [])],
                     'optimal_k': int(summary.get('optimal_k', 2))
                 }
 
-                
-                return render_template('index.html', 
-                    plots=True, 
-                    summary=summary or [],
+                return render_template(
+                    'index.html',
+                    plots=True,
+                    summary_kmeans=summary.get('summary_kmeans', []),
+                    summary_hdbscan=summary.get('summary_hdbscan', []),
                     pca_data=pca_data,
                     cluster_sizes=cluster_sizes,
                     elbow_data=elbow_data,
-                    pca_plot=summary['pca_plot'],
-                    cluster_sizes_plot=summary['cluster_sizes_plot'],
+                    pca_plot_kmeans=summary['pca_plot_kmeans'],
+                    pca_plot_hdbscan=summary['pca_plot_hdbscan'],
+                    cluster_sizes_kmeans=summary['cluster_sizes_kmeans'],
+                    cluster_sizes_hdbscan=summary['cluster_sizes_hdbscan'],
                     elbow_plot=summary['elbow_plot']
                 )
-    
+
     return render_template('index.html', plots=False)
+
 
 @main.route('/download', methods=['GET'])
 def download_results():
     APP_FOLDER = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(APP_FOLDER, 'outputs', 'clustered_visitors_final.csv')
-    
+    output_path = os.path.join(APP_FOLDER, 'outputs', 'clustered_visitors_combined.csv')
+
     if os.path.exists(output_path):
-        return send_file(output_path, 
+        return send_file(output_path,
                          mimetype='text/csv',
                          download_name='clustered_visitors.csv',
                          as_attachment=True)
     else:
         return "No results file available. Please process data first.", 404
 
+
 @main.route('/api/cluster-data', methods=['GET'])
 def get_cluster_data():
     APP_FOLDER = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(APP_FOLDER, 'outputs', 'clustered_visitors_final.csv')
-    
+    output_path = os.path.join(APP_FOLDER, 'outputs', 'clustered_visitors_combined.csv')
+
     if os.path.exists(output_path):
         df = pd.read_csv(output_path)
-        
-        # Get cluster summary
-        cluster_summary = []
-        for cluster in df['cluster'].unique():
-            cluster_df = df[df['cluster'] == cluster]
+
+        result = {
+            'total_visitors': len(df['Visitor id'].unique()) if 'Visitor id' in df.columns else len(df),
+            'features': [col for col in df.columns if col not in ['Visitor id', 'pca1', 'pca2', 'kmeans_cluster', 'hdbscan_cluster']],
+            'clusters': {
+                'kmeans': [],
+                'hdbscan': []
+            }
+        }
+
+        for cluster in sorted(df['kmeans_cluster'].dropna().unique()):
+            cluster_df = df[df['kmeans_cluster'] == cluster]
             summary = {
                 'cluster': int(cluster),
                 'size': len(cluster_df),
                 'percentage': round(len(cluster_df) / len(df) * 100, 2)
             }
-            
-            # Add most common values for each feature
-            for col in df.columns:
-                if col not in ['Visitor id', 'pca1', 'pca2', 'cluster']:
-                    most_common = cluster_df[col].value_counts().index[0] if not cluster_df[col].empty else 'Unknown'
+            for col in result['features']:
+                most_common = cluster_df[col].value_counts().idxmax() if not cluster_df[col].empty else 'Unknown'
+                summary[f'{col}_most_common'] = most_common
+            result['clusters']['kmeans'].append(summary)
+
+        if 'hdbscan_cluster' in df.columns:
+            for cluster in sorted(df['hdbscan_cluster'].dropna().unique()):
+                if cluster == -1:
+                    continue
+                cluster_df = df[df['hdbscan_cluster'] == cluster]
+                summary = {
+                    'cluster': int(cluster),
+                    'size': len(cluster_df),
+                    'percentage': round(len(cluster_df) / len(df) * 100, 2)
+                }
+                for col in result['features']:
+                    most_common = cluster_df[col].value_counts().idxmax() if not cluster_df[col].empty else 'Unknown'
                     summary[f'{col}_most_common'] = most_common
-            
-            cluster_summary.append(summary)
-        
-        return jsonify({
-            'clusters': cluster_summary,
-            'total_visitors': len(df['Visitor id'].unique()),
-            'features': [col for col in df.columns if col not in ['Visitor id', 'pca1', 'pca2', 'cluster']]
-        })
-    
+                result['clusters']['hdbscan'].append(summary)
+
+        return jsonify(result)
+
     return jsonify({'error': 'No data available'}), 404

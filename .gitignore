@@ -5,6 +5,7 @@ __pycache__/
 .env
 *.csv
 venv/
+venv311/
 outputs/
 .DS_Store
 static/plots/

@@ -3,12 +3,13 @@ import numpy as np
 import json
 import os
 import matplotlib
-matplotlib.use('Agg')  # For server use, no GUI
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+import hdbscan
 
 def find_optimal_k(data, max_k=10):
     inertias = []
@@ -45,31 +46,18 @@ def select_strong_features(df, candidate_cols, top_n, threshold):
 
     return selected_features
 
-def select_diverse_features(df, candidate_cols, top_n, threshold):
-    selected_features = []
-    total_rows = len(df)
+def select_diverse_features(df, selected_features, min_unique=2):
+    return [col for col in selected_features if df[col].nunique() >= min_unique]
 
-    for col in candidate_cols:
-        top_counts = df[col].value_counts().nlargest(top_n).sum()
-        top_percent = top_counts / total_rows
-        if top_percent < threshold:
-            selected_features.append(col)
-
-    return selected_features
+def safe_json_parse(value):
+    try:
+        return json.loads(value.replace("'", '"'))
+    except Exception:
+        return {}
 
 def process_file(input_path):
     df = pd.read_csv(input_path)
     df.columns = df.columns.str.strip()
-
-    def safe_json_parse(val):
-        if isinstance(val, dict):
-            return val
-        if pd.isnull(val):
-            return {}
-        try:
-            return json.loads(val.replace("'", '"'))
-        except json.JSONDecodeError:
-            return {}
 
     df['device_data'] = df['Meta data (device data)'].apply(safe_json_parse)
     df['network_data'] = df['Meta data (network data)'].apply(safe_json_parse)
@@ -99,10 +87,7 @@ def process_file(input_path):
     df['device_os'] = df['device_os'].str.strip('"')
 
     candidate_cols = ['network_org', 'State', 'device_browser_details', 'device_os', 'visitor_type','Product name']
-    strong_features = select_strong_features(df, candidate_cols, top_n=5, threshold=0.5)
-    diverse_features = select_diverse_features(df, candidate_cols, top_n=3, threshold=0.7)
-    # features = [col for col in strong_features if col in diverse_features]
-    features=strong_features
+    features = select_strong_features(df, candidate_cols, top_n=5, threshold=0.5)
 
     clustering_df = df[['Visitor id'] + features].copy()
 
@@ -110,10 +95,12 @@ def process_file(input_path):
         top_5 = clustering_df[col].value_counts().nlargest(5).index
         clustering_df[col] = clustering_df[col].apply(lambda x: x if x in top_5 else 'Other')
 
-    df_encoded = pd.get_dummies(clustering_df[features], drop_first=True)
+
+    df_encoded = pd.get_dummies(df[features])
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(df_encoded)
 
+    # ==== KMeans ====
     optimal_k, inertias = find_optimal_k(scaled_data)
 
     APP_FOLDER = os.path.dirname(os.path.abspath(__file__))
@@ -142,96 +129,114 @@ def process_file(input_path):
     plt.close()
 
     kmeans = KMeans(n_clusters=optimal_k, random_state=42)
-    labels = kmeans.fit_predict(scaled_data)
+    kmeans_labels = kmeans.fit_predict(scaled_data)
 
+    # ==== HDBSCAN ====
+    hdb = hdbscan.HDBSCAN(min_cluster_size=10)
+    hdb_labels = hdb.fit_predict(scaled_data)
+
+    # PCA
     pca = PCA(n_components=2)
     pca_data = pca.fit_transform(scaled_data)
+
+    clustering_df = df[['Visitor id'] + features].copy()
     clustering_df['pca1'] = pca_data[:, 0]
     clustering_df['pca2'] = pca_data[:, 1]
-    clustering_df['cluster'] = labels
+    clustering_df['kmeans_cluster'] = kmeans_labels
+    clustering_df['hdbscan_cluster'] = hdb_labels
 
-    # Cluster sizes plot with improved styling
-    plt.figure(figsize=(10, 6))
-    cluster_counts = clustering_df['cluster'].value_counts().sort_index()
-    
-    # Use a colorful palette
-    colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', 
-              '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5']
-    
-    bars = plt.bar(cluster_counts.index, cluster_counts.values, 
-                   color=[colors[i % len(colors)] for i in cluster_counts.index])
-    
-    plt.title("Visitor Cluster Distribution", fontsize=16)
-    plt.xlabel("Cluster", fontsize=12)
-    plt.ylabel("Number of Visitors", fontsize=12)
-    plt.xticks(cluster_counts.index)
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    
-    # Add value labels on top of bars
-    for bar in bars:
-        height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2., height + 5,
-                 f'{height}',
-                 ha='center', va='bottom', fontsize=10)
-    
-    plt.tight_layout()
-    cluster_size_path = os.path.join(plot_dir, 'cluster_sizes.png')
-    plt.savefig(cluster_size_path, dpi=100, bbox_inches='tight')
-    plt.close()
+    # APP_FOLDER = os.path.dirname(os.path.abspath(__file__))
+    # plot_dir = os.path.join(APP_FOLDER, '..', 'static', 'plots')
+    # os.makedirs(plot_dir, exist_ok=True)
 
-    # PCA plot with improved styling
-    plt.figure(figsize=(10, 8))
-    
-    # Create a scatter plot for each cluster with a different color
-    for i in range(optimal_k):
-        cluster_data = clustering_df[clustering_df['cluster'] == i]
-        plt.scatter(cluster_data['pca1'], cluster_data['pca2'], 
-                    c=[colors[i % len(colors)]], 
-                    label=f'Cluster {i}',
-                    s=70, alpha=0.8, edgecolors='w', linewidth=0.5)
-    
-    plt.title('PCA of Visitor Clusters', fontsize=16)
-    plt.xlabel('PCA 1', fontsize=12)
-    plt.ylabel('PCA 2', fontsize=12)
-    plt.legend(title='Clusters', title_fontsize=12)
-    plt.grid(True, linestyle='--', alpha=0.3)
-    
-    # Add a light background grid
-    plt.grid(True, linestyle='--', alpha=0.3)
-    
-    # Improve the layout
-    plt.tight_layout()
-    
-    pca_path = os.path.join(plot_dir, 'pca_plot.png')
-    plt.savefig(pca_path, dpi=100, bbox_inches='tight')
-    plt.close()
+    # # ==== Elbow Plot ====
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(range(1, 11), inertias, marker='o', linestyle='-', color='#3B82F6')
+    # plt.scatter(optimal_k, inertias[optimal_k - 1], s=200, c='#EF4444', edgecolors='white', linewidth=2)
+    # plt.title("Elbow Method For Optimal k")
+    # plt.xlabel("Number of clusters")
+    # plt.ylabel("SSE")
+    # plt.grid(True, linestyle='--', alpha=0.7)
+    # plt.tight_layout()
+    # elbow_path = os.path.join(plot_dir, 'elbow_plot.png')
+    # plt.savefig(elbow_path)
+    # plt.close()
 
+    # ==== Cluster Size Bar Plot ====
+    def plot_cluster_sizes(cluster_col, title, filename):
+        valid_df = clustering_df[clustering_df[cluster_col] != -1]
+        cluster_counts = valid_df[cluster_col].value_counts().sort_index()
+        plt.figure(figsize=(10, 6))
+        bars = plt.bar(cluster_counts.index, cluster_counts.values,
+                       color=sns.color_palette("husl", len(cluster_counts)))
+        plt.title(title)
+        plt.xlabel("Cluster")
+        plt.ylabel("Number of Visitors")
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width() / 2., height + 5, f'{int(height)}', ha='center')
+        plt.tight_layout()
+        out_path = os.path.join(plot_dir, filename)
+        plt.savefig(out_path)
+        plt.close()
+
+    plot_cluster_sizes('kmeans_cluster', "KMeans Cluster Distribution", "cluster_sizes_kmeans.png")
+    plot_cluster_sizes('hdbscan_cluster', "HDBSCAN Cluster Distribution", "cluster_sizes_hdbscan.png")
+
+    # ==== PCA Plot ====
+    def plot_pca(cluster_col, title, filename):
+        valid_df = clustering_df[clustering_df[cluster_col] != -1]
+        plt.figure(figsize=(10, 8))
+        for cluster in sorted(valid_df[cluster_col].unique()):
+            subset = valid_df[valid_df[cluster_col] == cluster]
+            plt.scatter(subset['pca1'], subset['pca2'], label=f'Cluster {cluster}', s=60, alpha=0.7)
+        plt.title(title)
+        plt.xlabel("PCA 1")
+        plt.ylabel("PCA 2")
+        plt.legend()
+        plt.tight_layout()
+        out_path = os.path.join(plot_dir, filename)
+        plt.savefig(out_path)
+        plt.close()
+
+    plot_pca('kmeans_cluster', 'KMeans PCA Plot', 'pca_plot_kmeans.png')
+    plot_pca('hdbscan_cluster', 'HDBSCAN PCA Plot', 'pca_plot_hdbscan.png')
+
+    # ==== Cluster Summary ====
     RENAME_MAP = {
         'State': 'State',
         'network_org': 'Organization of Network',
         'visitor_type': 'Visitor Type',
         'device_browser_details': 'Browser Used',
         'device_os': 'Type of Device',
-        'Product name':'Name of Product'
+        'Product name': 'Name of Product'
     }
 
     selected_renames = {col: RENAME_MAP[col] for col in features if col in RENAME_MAP}
 
-    summary = clustering_df.groupby('cluster').agg({
+    kmeans_summary = clustering_df.groupby('kmeans_cluster').agg({
         col: lambda x: x.mode().iloc[0] if not x.mode().empty else np.nan for col in features
     }).rename(columns=selected_renames).reset_index()
 
+    hdbscan_summary = clustering_df[clustering_df['hdbscan_cluster'] != -1].groupby('hdbscan_cluster').agg({
+        col: lambda x: x.mode().iloc[0] if not x.mode().empty else np.nan for col in features
+    }).rename(columns=selected_renames).reset_index()
+
+    # ==== Output CSV ====
     output_folder = os.path.join(APP_FOLDER, 'outputs')
     os.makedirs(output_folder, exist_ok=True)
-    output_path = os.path.join(output_folder, 'clustered_visitors_final.csv')
+    output_path = os.path.join(output_folder, 'clustered_visitors_combined.csv')
     clustering_df.to_csv(output_path, index=False)
 
     return {
-        'summary': summary.to_dict(orient='records'),
+        'summary_kmeans': kmeans_summary.to_dict(orient='records'),
+        'summary_hdbscan': hdbscan_summary.to_dict(orient='records'),
         'csv_path': output_path,
         'elbow_plot': 'plots/elbow_plot.png',
-        'cluster_sizes_plot': 'plots/cluster_sizes.png',
-        'pca_plot': 'plots/pca_plot.png',
+        'pca_plot_kmeans': 'plots/pca_plot_kmeans.png',
+        'pca_plot_hdbscan': 'plots/pca_plot_hdbscan.png',
+        'cluster_sizes_kmeans': 'plots/cluster_sizes_kmeans.png',
+        'cluster_sizes_hdbscan': 'plots/cluster_sizes_hdbscan.png',
         'optimal_k': optimal_k,
         'inertias': inertias,
         'features': features,

@@ -74,33 +74,38 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- KMeans PCA -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">PCA Visualization</h3>
-                    <div id="pca-plot" class="w-full h-64 md:h-80"></div>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-3">Principal Component Analysis showing visitor clusters in 2D space</p>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">KMeans PCA Visualization</h3>
+                    <div id="pca-plot-kmeans" class="w-full h-64 md:h-80"></div>
                 </div>
-                
+                <!-- HDBSCAN PCA -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Cluster Sizes</h3>
-                    <div id="cluster-sizes-plot" class="w-full h-64 md:h-80"></div>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-3">Distribution of visitors across different clusters</p>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">HDBSCAN PCA Visualization</h3>
+                    <div id="pca-plot-hdbscan" class="w-full h-64 md:h-80"></div>
                 </div>
-                
+
+                <!-- KMeans Cluster Sizes -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Elbow Method</h3>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">KMeans Cluster Sizes</h3>
+                    <div id="cluster-sizes-plot-kmeans" class="w-full h-64 md:h-80"></div>
+                </div>
+                <!-- HDBSCAN Cluster Sizes -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">HDBSCAN Cluster Sizes</h3>
+                    <div id="cluster-sizes-plot-hdbscan" class="w-full h-64 md:h-80"></div>
+                </div>
+
+                <!-- Elbow Method -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl col-span-1 md:col-span-2">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Elbow Method (KMeans)</h3>
                     <div id="elbow-plot" class="w-full h-64 md:h-80"></div>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-3">Elbow method used to determine the optimal number of clusters</p>
                 </div>
-                
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
+
+                <!-- Download -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl col-span-1 md:col-span-2">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Download Results</h3>
-                    <div class="flex flex-col items-center justify-center h-full">
-                        <div class="text-center mb-6">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                            </svg>
-                            <p class="text-gray-600 dark:text-gray-400 mb-4">Download the complete clustering results as a CSV file</p>
-                        </div>
+                    <div class="flex flex-col items-center justify-center">
                         <a href="{{ url_for('main.download_results') }}" class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium rounded-lg hover:from-green-600 hover:to-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-800 shadow-md hover:shadow-lg transition-all duration-200 flex items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -111,85 +116,91 @@
                 </div>
             </div>
 
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 transition-all duration-200 hover:shadow-xl">
-                <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-6">Cluster Profile Summary</h3>
-                
-                {% if summary['summary']|length > 0 %}
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead>
-                            <tr>
-                                {% for col in summary.summary[0].keys() %}
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-900 rounded-tl-lg rounded-tr-lg">
-                                    {{ col }}
-                                </th>
+            <!-- Cluster Summaries -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- KMeans Summary -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
+                    <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">KMeans Cluster Summary</h3>
+                    {% if summary_kmeans %}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead>
+                                <tr>
+                                    {% for col in summary_kmeans[0].keys() %}
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-900">
+                                        {{ col }}
+                                    </th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                {% for row in summary_kmeans %}
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                                    {% for col, value in row.items() %}
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if col == 'cluster' %}
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cluster-{{ value }} text-white">
+                                            Cluster {{ value }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-gray-700 dark:text-gray-300">{{ value }}</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
                                 {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {% for row in summary.summary %}
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
-                                {% for col, value in row.items() %}
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    {% if col == 'cluster' %}
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cluster-{{ value }} text-white">
-                                        Cluster {{ value }}
-                                    </span>
-                                    {% else %}
-                                    <span class="text-gray-700 dark:text-gray-300">{{ value }}</span>
-                                    {% endif %}
-                                </td>
-                                {% endfor %}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-gray-600 dark:text-gray-400">No KMeans summary data available.</p>
+                    {% endif %}
                 </div>
-                {% else %}
-                <p class="text-gray-600 dark:text-gray-400">No summary data to display.</p>
-                {% endif %}
+
+                <!-- HDBSCAN Summary -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
+                    <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">HDBSCAN Cluster Summary</h3>
+                    {% if summary_hdbscan %}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead>
+                                <tr>
+                                    {% for col in summary_hdbscan[0].keys() %}
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-900">
+                                        {{ col }}
+                                    </th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                {% for row in summary_hdbscan %}
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                                    {% for col, value in row.items() %}
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if col == 'cluster' %}
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cluster-{{ value }} text-white">
+                                            Cluster {{ value }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-gray-700 dark:text-gray-300">{{ value }}</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-gray-600 dark:text-gray-400">No HDBSCAN summary data available.</p>
+                    {% endif %}
+                </div>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
-    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // // Theme toggle functionality
-            // const themeToggle = document.getElementById('theme-toggle');
-            // const lightIcon = document.getElementById('light-icon');
-            // const darkIcon = document.getElementById('dark-icon');
-            
-            // // Check for saved theme preference or use system preference
-            // const userTheme = localStorage.getItem('theme');
-            // const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            
-            // //Initial theme setup
-            // if (userTheme === 'dark' || (!userTheme && systemTheme)) {
-            //     document.documentElement.classList.add('dark');
-            //     lightIcon.classList.remove('hidden');
-            //     darkIcon.classList.add('hidden');
-            // } else {
-            //     lightIcon.classList.add('hidden');
-            //     darkIcon.classList.remove('hidden');
-            // }
-            
-            // // Toggle theme
-            // themeToggle.addEventListener('click', () => {
-            //     document.documentElement.classList.toggle('dark');
-                
-            //     // Update icons
-            //     lightIcon.classList.toggle('hidden');
-            //     darkIcon.classList.toggle('hidden');
-                
-            //     // Save preference
-            //     if (document.documentElement.classList.contains('dark')) {
-            //         localStorage.setItem('theme', 'dark');
-            //     } else {
-            //         localStorage.setItem('theme', 'light');
-            //     }
-            // });
-
             document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem('theme','dark');
                 const themeToggleBtn = document.getElementById('theme-toggle');
@@ -314,192 +325,220 @@
                 loadingDiv.classList.remove('hidden');
             });
 
-            // Interactive charts
             {% if plots %}
-                // PCA Plot
-                const pcaData = {{ pca_data|tojson }};
+                // ===== KMEANS PLOTS =====
+                // KMeans PCA Plot
+                const kmeansPcaData = {{ pca_data.kmeans|tojson }};
+                createPcaPlot('pca-plot-kmeans', kmeansPcaData, 'KMeans PCA Visualization');
                 
-                const pcaColors = [
-                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-                    '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5'
-                ];
+                // KMeans Cluster Sizes
+                const kmeansClusterSizes = {{ cluster_sizes.kmeans|tojson }};
+                createClusterSizePlot('cluster-sizes-plot-kmeans', kmeansClusterSizes, 'KMeans Cluster Distribution');
                 
-                const traces = [];
-                const clusters = [...new Set(pcaData.cluster)];
+                // ===== HDBSCAN PLOTS =====
+                // HDBSCAN PCA Plot
+                const hdbscanPcaData = {{ pca_data.hdbscan|tojson }};
+                createPcaPlot('pca-plot-hdbscan', hdbscanPcaData, 'HDBSCAN PCA Visualization');
                 
-                clusters.forEach(cluster => {
-                    const clusterData = pcaData.data.filter(d => d.cluster === cluster);
-                    traces.push({
-                        x: clusterData.map(d => d.pca1),
-                        y: clusterData.map(d => d.pca2),
-                        mode: 'markers',
-                        type: 'scatter',
-                        name: `Cluster ${cluster}`,
-                        marker: {
-                            color: pcaColors[cluster % pcaColors.length],
-                            size: 8
-                        }
-                    });
-                });
+                // HDBSCAN Cluster Sizes
+                const hdbscanClusterSizes = {{ cluster_sizes.hdbscan|tojson }};
+                createClusterSizePlot('cluster-sizes-plot-hdbscan', hdbscanClusterSizes, 'HDBSCAN Cluster Distribution');
                 
-                const pcaLayout = {
-                    title: 'PCA of Visitor Clusters',
-                    xaxis: {
-                        title: 'PCA 1',
-                        zeroline: false
-                    },
-                    yaxis: {
-                        title: 'PCA 2',
-                        zeroline: false
-                    },
-                    hovermode: 'closest',
-                    paper_bgcolor: 'rgba(0,0,0,0)',
-                    plot_bgcolor: 'rgba(0,0,0,0)',
-                    font: {
-                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
-                    },
-                    margin: {
-                        l: 50,
-                        r: 20,
-                        t: 50,
-                        b: 50
-                    }
-                };
-                
-                Plotly.newPlot('pca-plot', traces, pcaLayout, {responsive: true});
-                
-                // Cluster Sizes Plot
-                const clusterSizes = {{ cluster_sizes|tojson }};
-                
-                const clusterSizesData = [{
-                    x: clusterSizes.clusters,
-                    y: clusterSizes.sizes,
-                    type: 'bar',
-                    marker: {
-                        color: clusterSizes.clusters.map(c => pcaColors[c % pcaColors.length])
-                    }
-                }];
-                
-                const clusterSizesLayout = {
-                    title: 'Visitor Cluster Distribution',
-                    xaxis: {
-                        title: 'Cluster',
-                        tickmode: 'array',
-                        tickvals: clusterSizes.clusters,
-                        ticktext: clusterSizes.clusters.map(c => `Cluster ${c}`)
-                    },
-                    yaxis: {
-                        title: 'Number of Visitors'
-                    },
-                    paper_bgcolor: 'rgba(0,0,0,0)',
-                    plot_bgcolor: 'rgba(0,0,0,0)',
-                    font: {
-                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
-                    },
-                    margin: {
-                        l: 50,
-                        r: 20,
-                        t: 50,
-                        b: 50
-                    }
-                };
-                
-                Plotly.newPlot('cluster-sizes-plot', clusterSizesData, clusterSizesLayout, {responsive: true});
-                
-                // Elbow Plot
+                // ===== ELBOW PLOT =====
                 const elbowData = {{ elbow_data|tojson }};
-                
-                const elbowPlotData = [{
-                    x: elbowData.k_values,
-                    y: elbowData.inertias,
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    line: {
-                        color: '#3B82F6',
-                        width: 2
-                    },
-                    marker: {
-                        color: '#3B82F6',
-                        size: 8
-                    }
-                }];
-                
-                // Add a marker for the optimal k
-                elbowPlotData.push({
-                    x: [elbowData.optimal_k],
-                    y: [elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)]],
-                    type: 'scatter',
-                    mode: 'markers',
-                    marker: {
-                        color: '#EF4444',
-                        size: 12,
-                        symbol: 'circle',
-                        line: {
-                            color: '#FFFFFF',
-                            width: 2
-                        }
-                    },
-                    name: 'Optimal K'
-                });
-                
-                const elbowLayout = {
-                    title: 'Elbow Method For Optimal k',
-                    xaxis: {
-                        title: 'Number of clusters',
-                        tickmode: 'array',
-                        tickvals: elbowData.k_values
-                    },
-                    yaxis: {
-                        title: 'SSE (Sum of Squared Errors)'
-                    },
-                    paper_bgcolor: 'rgba(0,0,0,0)',
-                    plot_bgcolor: 'rgba(0,0,0,0)',
-                    font: {
-                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
-                    },
-                    margin: {
-                        l: 50,
-                        r: 20,
-                        t: 50,
-                        b: 50
-                    },
-                    annotations: [{
-                        x: elbowData.optimal_k,
-                        y: elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)],
-                        xref: 'x',
-                        yref: 'y',
-                        text: 'Optimal K = ' + elbowData.optimal_k,
-                        showarrow: true,
-                        arrowhead: 2,
-                        ax: 0,
-                        ay: -40
-                    }]
-                };
-                
-                Plotly.newPlot('elbow-plot', elbowPlotData, elbowLayout, {responsive: true});
+                createElbowPlot('elbow-plot', elbowData);
                 
                 // Update plots when theme changes
-                themeToggle.addEventListener('click', () => {
+                const themeToggle = document.getElementById('theme-toggle');
+                if (themeToggle) {
+                    themeToggle.addEventListener('click', updatePlotThemes);
+                }
+            
+
+                // Function to create PCA plot
+                function createPcaPlot(elementId, pcaData, title) {
+                    const pcaColors = [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                        '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5'
+                    ];
+                    
+                    const traces = [];
+                    const clusters = [...new Set(pcaData.map(d => d.cluster))];
+                    
+                    clusters.forEach(cluster => {
+                        const clusterData = pcaData.filter(d => d.cluster === cluster);
+                        traces.push({
+                            x: clusterData.map(d => d.x),
+                            y: clusterData.map(d => d.y),
+                            mode: 'markers',
+                            type: 'scatter',
+                            name: `Cluster ${cluster}`,
+                            marker: {
+                                color: pcaColors[cluster % pcaColors.length],
+                                size: 8
+                            }
+                        });
+                    });
+                    
+                    const layout = {
+                        title: title,
+                        xaxis: {
+                            title: 'PCA 1',
+                            zeroline: false
+                        },
+                        yaxis: {
+                            title: 'PCA 2',
+                            zeroline: false
+                        },
+                        hovermode: 'closest',
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                        font: {
+                            color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        },
+                        margin: {
+                            l: 50,
+                            r: 20,
+                            t: 50,
+                            b: 50
+                        }
+                    };
+                    
+                    Plotly.newPlot(elementId, traces, layout, {responsive: true});
+                }
+
+                // Function to create cluster size plot
+                function createClusterSizePlot(elementId, clusterSizes, title) {
+                    const pcaColors = [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                        '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5'
+                    ];
+                    
+                    const data = [{
+                        x: clusterSizes.clusters,
+                        y: clusterSizes.sizes,
+                        type: 'bar',
+                        marker: {
+                            color: clusterSizes.clusters.map(c => pcaColors[c % pcaColors.length])
+                        }
+                    }];
+                    
+                    const layout = {
+                        title: title,
+                        xaxis: {
+                            title: 'Cluster',
+                            tickmode: 'array',
+                            tickvals: clusterSizes.clusters,
+                            ticktext: clusterSizes.clusters.map(c => `Cluster ${c}`)
+                        },
+                        yaxis: {
+                            title: 'Number of Visitors'
+                        },
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                        font: {
+                            color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        },
+                        margin: {
+                            l: 50,
+                            r: 20,
+                            t: 50,
+                            b: 50
+                        }
+                    };
+                    
+                    Plotly.newPlot(elementId, data, layout, {responsive: true});
+                }
+
+                // Function to create elbow plot
+                function createElbowPlot(elementId, elbowData) {
+                    const plotData = [{
+                        x: elbowData.k_values,
+                        y: elbowData.inertias,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        line: {
+                            color: '#3B82F6',
+                            width: 2
+                        },
+                        marker: {
+                            color: '#3B82F6',
+                            size: 8
+                        }
+                    }];
+                    
+                    // Add a marker for the optimal k
+                    plotData.push({
+                        x: [elbowData.optimal_k],
+                        y: [elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)]],
+                        type: 'scatter',
+                        mode: 'markers',
+                        marker: {
+                            color: '#EF4444',
+                            size: 12,
+                            symbol: 'circle',
+                            line: {
+                                color: '#FFFFFF',
+                                width: 2
+                            }
+                        },
+                        name: 'Optimal K'
+                    });
+                    
+                    const layout = {
+                        title: 'Elbow Method For Optimal k',
+                        xaxis: {
+                            title: 'Number of clusters',
+                            tickmode: 'array',
+                            tickvals: elbowData.k_values
+                        },
+                        yaxis: {
+                            title: 'SSE (Sum of Squared Errors)'
+                        },
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                        font: {
+                            color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        },
+                        margin: {
+                            l: 50,
+                            r: 20,
+                            t: 50,
+                            b: 50
+                        },
+                        annotations: [{
+                            x: elbowData.optimal_k,
+                            y: elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)],
+                            xref: 'x',
+                            yref: 'y',
+                            text: 'Optimal K = ' + elbowData.optimal_k,
+                            showarrow: true,
+                            arrowhead: 2,
+                            ax: 0,
+                            ay: -40
+                        }]
+                    };
+                    
+                    Plotly.newPlot(elementId, plotData, layout, {responsive: true});
+                }
+
+                // Function to update plot themes when dark/light mode changes
+                function updatePlotThemes() {
                     const textColor = document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151';
                     
-                    Plotly.relayout('pca-plot', {
-                        'font.color': textColor,
-                        'paper_bgcolor': 'rgba(0,0,0,0)',
-                        'plot_bgcolor': 'rgba(0,0,0,0)'
+                    // Update all plot containers
+                    ['pca-plot-kmeans', 'pca-plot-hdbscan', 
+                    'cluster-sizes-plot-kmeans', 'cluster-sizes-plot-hdbscan',
+                    'elbow-plot'].forEach(elementId => {
+                        if (document.getElementById(elementId)) {
+                            Plotly.relayout(elementId, {
+                                'font.color': textColor,
+                                'paper_bgcolor': 'rgba(0,0,0,0)',
+                                'plot_bgcolor': 'rgba(0,0,0,0)'
+                            });
+                        }
                     });
-                    
-                    Plotly.relayout('cluster-sizes-plot', {
-                        'font.color': textColor,
-                        'paper_bgcolor': 'rgba(0,0,0,0)',
-                        'plot_bgcolor': 'rgba(0,0,0,0)'
-                    });
-                    
-                    Plotly.relayout('elbow-plot', {
-                        'font.color': textColor,
-                        'paper_bgcolor': 'rgba(0,0,0,0)',
-                        'plot_bgcolor': 'rgba(0,0,0,0)'
-                    });
-                });
+                }
             {% endif %}
         });
     </script>

@@ -71,7 +71,9 @@ def index():
                     pca_plot_hdbscan=summary['pca_plot_hdbscan'],
                     cluster_sizes_kmeans=summary['cluster_sizes_kmeans'],
                     cluster_sizes_hdbscan=summary['cluster_sizes_hdbscan'],
-                    elbow_plot=summary['elbow_plot']
+                    elbow_plot=summary['elbow_plot'],
+                    silhouette_kmeans=summary.get('silhouette_kmeans'),
+                    silhouette_hdbscan=summary.get('silhouette_hdbscan')
                 )
 
     return render_template('index.html', plots=False)

@@ -10,6 +10,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import hdbscan
+from sklearn.metrics import silhouette_score
+
 
 def find_optimal_k(data, max_k=10):
     inertias = []
@@ -131,9 +133,21 @@ def process_file(input_path):
     kmeans = KMeans(n_clusters=optimal_k, random_state=42)
     kmeans_labels = kmeans.fit_predict(scaled_data)
 
+    # Compute silhouette score for KMeans
+    silhouette_kmeans = silhouette_score(scaled_data, kmeans_labels)
+
+
     # ==== HDBSCAN ====
     hdb = hdbscan.HDBSCAN(min_cluster_size=10)
     hdb_labels = hdb.fit_predict(scaled_data)
+
+    # Compute silhouette score for HDBSCAN (only on non-noise points)
+    mask = hdb_labels != -1
+    if mask.sum() > 1:  # need at least 2 samples to compute score
+        silhouette_hdbscan = silhouette_score(scaled_data[mask], hdb_labels[mask])
+    else:
+        silhouette_hdbscan = None
+
 
     # PCA
     pca = PCA(n_components=2)
@@ -237,6 +251,8 @@ def process_file(input_path):
         'pca_plot_hdbscan': 'plots/pca_plot_hdbscan.png',
         'cluster_sizes_kmeans': 'plots/cluster_sizes_kmeans.png',
         'cluster_sizes_hdbscan': 'plots/cluster_sizes_hdbscan.png',
+        'silhouette_kmeans': silhouette_kmeans,
+        'silhouette_hdbscan': silhouette_hdbscan,
         'optimal_k': optimal_k,
         'inertias': inertias,
         'features': features,

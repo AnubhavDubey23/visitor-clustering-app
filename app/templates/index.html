@@ -6,9 +6,6 @@
     <title>Visitor Clustering Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-    <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.24.1/plotly.min.js"></script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-200">
     <div class="container mx-auto px-4 py-8">
@@ -18,12 +15,10 @@
                 <p class="text-gray-600 dark:text-gray-400">Upload your tracking data to discover visitor segments and patterns</p>
             </div>
             <div class="flex items-center space-x-4">
-                <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 focus:outline-none">
-                    <!-- Sun icon -->
+                <button id="theme-toggle" aria-label="Toggle dark mode" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 focus:outline-none">
                     <svg id="light-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
-                    <!-- Moon icon -->
                     <svg id="dark-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                     </svg>
@@ -47,7 +42,7 @@
                             </label>
                             <p class="pl-1">or drag and drop</p>
                         </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">CSV files only</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">CSV files only (max 10MB)</p>
                     </div>
                     <div class="flex justify-center">
                         <button type="submit" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 shadow-md hover:shadow-lg transition-all duration-200">
@@ -77,29 +72,62 @@
                 <!-- KMeans PCA -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">KMeans PCA Visualization</h3>
-                    <div id="pca-plot-kmeans" class="w-full h-64 md:h-80"></div>
+                    <div id="pca-plot-kmeans" class="w-full h-64 md:h-80 relative">
+                        <div class="plot-loading absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
                 </div>
                 <!-- HDBSCAN PCA -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">HDBSCAN PCA Visualization</h3>
-                    <div id="pca-plot-hdbscan" class="w-full h-64 md:h-80"></div>
+                    <div id="pca-plot-hdbscan" class="w-full h-64 md:h-80 relative">
+                        <div class="plot-loading absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- KMeans Cluster Sizes -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">KMeans Cluster Sizes</h3>
-                    <div id="cluster-sizes-plot-kmeans" class="w-full h-64 md:h-80"></div>
+                    <div id="cluster-sizes-plot-kmeans" class="w-full h-64 md:h-80 relative">
+                        <div class="plot-loading absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
                 </div>
                 <!-- HDBSCAN Cluster Sizes -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">HDBSCAN Cluster Sizes</h3>
-                    <div id="cluster-sizes-plot-hdbscan" class="w-full h-64 md:h-80"></div>
+                    <div id="cluster-sizes-plot-hdbscan" class="w-full h-64 md:h-80 relative">
+                        <div class="plot-loading absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Elbow Method -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl col-span-1 md:col-span-2">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Elbow Method (KMeans)</h3>
-                    <div id="elbow-plot" class="w-full h-64 md:h-80"></div>
+                    <div id="elbow-plot" class="w-full h-64 md:h-80 relative">
+                        <div class="plot-loading absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Silhouette Scores -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl col-span-1 md:col-span-2">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Silhouette Scores</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-gray-700 dark:text-gray-300"><span class="font-medium">KMeans:</span> {{ silhouette_kmeans|round(3) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-700 dark:text-gray-300"><span class="font-medium">HDBSCAN:</span> {{ silhouette_hdbscan|round(3) }}</p>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Download -->
@@ -200,50 +228,44 @@
         </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            document.addEventListener('DOMContentLoaded', function() {
-                localStorage.setItem('theme','dark');
-                const themeToggleBtn = document.getElementById('theme-toggle');
-                const darkIcon = document.getElementById('dark-icon');
-                const lightIcon = document.getElementById('light-icon');
-
-                // Function to set the theme and icons
-                function setTheme(isDark) {
-                    if (isDark) {
-                        document.documentElement.classList.add('dark');
-                        localStorage.setItem('theme', 'dark');
-                        darkIcon.classList.add('hidden');
-                        lightIcon.classList.remove('hidden');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                        localStorage.setItem('theme', 'light');
-                        lightIcon.classList.add('hidden');
-                        darkIcon.classList.remove('hidden');
-                    }
-                }
-
-                // Initial theme setup
-                const storedTheme = localStorage.getItem('theme');
-                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                
-                if (storedTheme === 'dark' || (!storedTheme && systemDark)) {
-                    setTheme(true);
-                } else {
-                    setTheme(false);
-                }
-
-                // Toggle theme on click
-                themeToggleBtn.addEventListener('click', function() {
-                    const isDark = document.documentElement.classList.contains('dark');
-                    setTheme(!isDark);
-                    
-                    // Update charts if they exist
-                    if (typeof updateChartThemes === 'function') {
-                        updateChartThemes();
-                    }
-                });
+        // Load Plotly dynamically
+        function loadPlotly() {
+            return new Promise((resolve) => {
+                if (window.Plotly) return resolve();
+                const script = document.createElement('script');
+                script.src = "https://cdn.jsdelivr.net/npm/plotly.js-dist@2.24.1/plotly.min.js";
+                script.onload = resolve;
+                script.onerror = () => console.error("Failed to load Plotly!");
+                document.head.appendChild(script);
             });
-            
+        }
+
+        // Theme management
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            const darkIcon = document.getElementById('dark-icon');
+            const lightIcon = document.getElementById('light-icon');
+
+            function setTheme(isDark) {
+                document.documentElement.classList.toggle('dark', isDark);
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                darkIcon.classList.toggle('hidden', isDark);
+                lightIcon.classList.toggle('hidden', !isDark);
+                
+                if (typeof updatePlotThemes === 'function') {
+                    updatePlotThemes();
+                }
+            }
+
+            // Initialize theme
+            const storedTheme = localStorage.getItem('theme');
+            const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            setTheme(storedTheme ? storedTheme === 'dark' : systemDark);
+
+            themeToggleBtn.addEventListener('click', () => {
+                setTheme(!document.documentElement.classList.contains('dark'));
+            });
+
             // File upload functionality
             const form = document.getElementById('uploadForm');
             const uploadArea = document.querySelector('.upload-area');
@@ -283,41 +305,30 @@
                 const dt = e.dataTransfer;
                 const files = dt.files;
                 fileInput.files = files;
-                
-                // Show file name
-                if (files[0]) {
-                    const fileNameElement = document.createElement('p');
-                    fileNameElement.textContent = `Selected file: ${files[0].name}`;
-                    fileNameElement.className = 'mt-4 text-sm font-medium text-blue-600 dark:text-blue-400';
-                    
-                    // Remove any existing file name display
-                    const existingFileName = uploadArea.querySelector('.selected-file-name');
-                    if (existingFileName) {
-                        existingFileName.remove();
-                    }
-                    
-                    fileNameElement.classList.add('selected-file-name');
-                    uploadArea.appendChild(fileNameElement);
-                }
+                updateFileNameDisplay(files[0]);
             }
             
             // Show file name when selected via button
             fileInput.addEventListener('change', function() {
                 if (this.files[0]) {
-                    const fileNameElement = document.createElement('p');
-                    fileNameElement.textContent = `Selected file: ${this.files[0].name}`;
-                    fileNameElement.className = 'mt-4 text-sm font-medium text-blue-600 dark:text-blue-400';
-                    
-                    // Remove any existing file name display
-                    const existingFileName = uploadArea.querySelector('.selected-file-name');
-                    if (existingFileName) {
-                        existingFileName.remove();
-                    }
-                    
-                    fileNameElement.classList.add('selected-file-name');
-                    uploadArea.appendChild(fileNameElement);
+                    updateFileNameDisplay(this.files[0]);
                 }
             });
+
+            function updateFileNameDisplay(file) {
+                const fileNameElement = document.createElement('p');
+                fileNameElement.textContent = `Selected file: ${file.name}`;
+                fileNameElement.className = 'mt-4 text-sm font-medium text-blue-600 dark:text-blue-400';
+                
+                // Remove any existing file name display
+                const existingFileName = uploadArea.querySelector('.selected-file-name');
+                if (existingFileName) {
+                    existingFileName.remove();
+                }
+                
+                fileNameElement.classList.add('selected-file-name');
+                uploadArea.appendChild(fileNameElement);
+            }
             
             // Show loading spinner on form submit
             form.addEventListener('submit', function() {
@@ -326,221 +337,321 @@
             });
 
             {% if plots %}
-                // ===== KMEANS PLOTS =====
-                // KMeans PCA Plot
-                const kmeansPcaData = {{ pca_data.kmeans|tojson }};
-                createPcaPlot('pca-plot-kmeans', kmeansPcaData, 'KMeans PCA Visualization');
+                // Initialize visualizations after DOM is ready
+                initializeVisualizations().catch(console.error);
+            {% endif %}
+        });
+
+        {% if plots %}
+        // Visualization functions
+        async function initializeVisualizations() {
+            try {
+                await loadPlotly();
                 
-                // KMeans Cluster Sizes
-                const kmeansClusterSizes = {{ cluster_sizes.kmeans|tojson }};
-                createClusterSizePlot('cluster-sizes-plot-kmeans', kmeansClusterSizes, 'KMeans Cluster Distribution');
+                // Create plots with error handling
+                await Promise.all([
+                    createPcaPlot('pca-plot-kmeans', {{ pca_data.kmeans|tojson }}, 'KMeans PCA Visualization'),
+                    createPcaPlot('pca-plot-hdbscan', {{ pca_data.hdbscan|tojson }}, 'HDBSCAN PCA Visualization'),
+                    createClusterSizePlot('cluster-sizes-plot-kmeans', {{ cluster_sizes.kmeans|tojson }}, 'KMeans Cluster Distribution'),
+                    createClusterSizePlot('cluster-sizes-plot-hdbscan', {{ cluster_sizes.hdbscan|tojson }}, 'HDBSCAN Cluster Distribution'),
+                    createElbowPlot('elbow-plot', {{ elbow_data|tojson }})
+                ]);
                 
-                // ===== HDBSCAN PLOTS =====
-                // HDBSCAN PCA Plot
-                const hdbscanPcaData = {{ pca_data.hdbscan|tojson }};
-                createPcaPlot('pca-plot-hdbscan', hdbscanPcaData, 'HDBSCAN PCA Visualization');
-                
-                // HDBSCAN Cluster Sizes
-                const hdbscanClusterSizes = {{ cluster_sizes.hdbscan|tojson }};
-                createClusterSizePlot('cluster-sizes-plot-hdbscan', hdbscanClusterSizes, 'HDBSCAN Cluster Distribution');
-                
-                // ===== ELBOW PLOT =====
-                const elbowData = {{ elbow_data|tojson }};
-                createElbowPlot('elbow-plot', elbowData);
-                
-                // Update plots when theme changes
+                // Set up theme switching after plots are created
                 const themeToggle = document.getElementById('theme-toggle');
                 if (themeToggle) {
                     themeToggle.addEventListener('click', updatePlotThemes);
                 }
-            
+            } catch (error) {
+                console.error('Visualization error:', error);
+                document.querySelectorAll('[id$="-plot"]').forEach(el => {
+                    el.innerHTML = '<p class="text-red-500">Error loading visualization</p>';
+                });
+            }
+        }
 
-                // Function to create PCA plot
-                function createPcaPlot(elementId, pcaData, title) {
-                    const pcaColors = [
-                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-                        '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5'
-                    ];
-                    
-                    const traces = [];
-                    const clusters = [...new Set(pcaData.map(d => d.cluster))];
-                    
-                    clusters.forEach(cluster => {
-                        const clusterData = pcaData.filter(d => d.cluster === cluster);
-                        traces.push({
-                            x: clusterData.map(d => d.x),
-                            y: clusterData.map(d => d.y),
-                            mode: 'markers',
-                            type: 'scatter',
-                            name: `Cluster ${cluster}`,
-                            marker: {
-                                color: pcaColors[cluster % pcaColors.length],
-                                size: 8
-                            }
-                        });
-                    });
-                    
-                    const layout = {
-                        title: title,
-                        xaxis: {
-                            title: 'PCA 1',
-                            zeroline: false
-                        },
-                        yaxis: {
-                            title: 'PCA 2',
-                            zeroline: false
-                        },
-                        hovermode: 'closest',
-                        paper_bgcolor: 'rgba(0,0,0,0)',
-                        plot_bgcolor: 'rgba(0,0,0,0)',
-                        font: {
-                            color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
-                        },
-                        margin: {
-                            l: 50,
-                            r: 20,
-                            t: 50,
-                            b: 50
-                        }
-                    };
-                    
-                    Plotly.newPlot(elementId, traces, layout, {responsive: true});
+        function createPcaPlot(elementId, pcaData, title) {
+            try {
+                const container = document.getElementById(elementId);
+                if (!container) {
+                    console.error(`Plot container ${elementId} not found`);
+                    return;
                 }
 
-                // Function to create cluster size plot
-                function createClusterSizePlot(elementId, clusterSizes, title) {
-                    const pcaColors = [
-                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-                        '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5'
-                    ];
-                    
-                    const data = [{
-                        x: clusterSizes.clusters,
-                        y: clusterSizes.sizes,
-                        type: 'bar',
-                        marker: {
-                            color: clusterSizes.clusters.map(c => pcaColors[c % pcaColors.length])
-                        }
-                    }];
-                    
-                    const layout = {
-                        title: title,
-                        xaxis: {
-                            title: 'Cluster',
-                            tickmode: 'array',
-                            tickvals: clusterSizes.clusters,
-                            ticktext: clusterSizes.clusters.map(c => `Cluster ${c}`)
-                        },
-                        yaxis: {
-                            title: 'Number of Visitors'
-                        },
-                        paper_bgcolor: 'rgba(0,0,0,0)',
-                        plot_bgcolor: 'rgba(0,0,0,0)',
-                        font: {
-                            color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
-                        },
-                        margin: {
-                            l: 50,
-                            r: 20,
-                            t: 50,
-                            b: 50
-                        }
-                    };
-                    
-                    Plotly.newPlot(elementId, data, layout, {responsive: true});
+                // Hide loading spinner
+                const loadingElement = container.querySelector('.plot-loading');
+                if (loadingElement) loadingElement.remove();
+
+                if (!pcaData || pcaData.length === 0) {
+                    container.innerHTML = '<p class="text-red-500">No PCA data available</p>';
+                    return;
                 }
 
-                // Function to create elbow plot
-                function createElbowPlot(elementId, elbowData) {
-                    const plotData = [{
-                        x: elbowData.k_values,
-                        y: elbowData.inertias,
-                        type: 'scatter',
-                        mode: 'lines+markers',
-                        line: {
-                            color: '#3B82F6',
-                            width: 2
-                        },
-                        marker: {
-                            color: '#3B82F6',
-                            size: 8
-                        }
-                    }];
-                    
-                    // Add a marker for the optimal k
-                    plotData.push({
-                        x: [elbowData.optimal_k],
-                        y: [elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)]],
-                        type: 'scatter',
+                const pcaColors = [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5'
+                ];
+                
+                // Calculate dynamic ranges
+                const allX = pcaData.map(d => d.x);
+                const allY = pcaData.map(d => d.y);
+                const xRange = [Math.min(...allX) * 1.1, Math.max(...allX) * 1.1];
+                const yRange = [Math.min(...allY) * 1.1, Math.max(...allY) * 1.1];
+                
+                const traces = [];
+                const clusters = [...new Set(pcaData.map(d => d.cluster))];
+                
+                clusters.forEach(cluster => {
+                    const clusterData = pcaData.filter(d => d.cluster === cluster);
+                    traces.push({
+                        x: clusterData.map(d => d.x),
+                        y: clusterData.map(d => d.y),
                         mode: 'markers',
+                        type: 'scatter',
+                        name: `Cluster ${cluster}`,
                         marker: {
-                            color: '#EF4444',
-                            size: 12,
-                            symbol: 'circle',
-                            line: {
-                                color: '#FFFFFF',
-                                width: 2
-                            }
-                        },
-                        name: 'Optimal K'
-                    });
-                    
-                    const layout = {
-                        title: 'Elbow Method For Optimal k',
-                        xaxis: {
-                            title: 'Number of clusters',
-                            tickmode: 'array',
-                            tickvals: elbowData.k_values
-                        },
-                        yaxis: {
-                            title: 'SSE (Sum of Squared Errors)'
-                        },
-                        paper_bgcolor: 'rgba(0,0,0,0)',
-                        plot_bgcolor: 'rgba(0,0,0,0)',
-                        font: {
-                            color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
-                        },
-                        margin: {
-                            l: 50,
-                            r: 20,
-                            t: 50,
-                            b: 50
-                        },
-                        annotations: [{
-                            x: elbowData.optimal_k,
-                            y: elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)],
-                            xref: 'x',
-                            yref: 'y',
-                            text: 'Optimal K = ' + elbowData.optimal_k,
-                            showarrow: true,
-                            arrowhead: 2,
-                            ax: 0,
-                            ay: -40
-                        }]
-                    };
-                    
-                    Plotly.newPlot(elementId, plotData, layout, {responsive: true});
-                }
-
-                // Function to update plot themes when dark/light mode changes
-                function updatePlotThemes() {
-                    const textColor = document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151';
-                    
-                    // Update all plot containers
-                    ['pca-plot-kmeans', 'pca-plot-hdbscan', 
-                    'cluster-sizes-plot-kmeans', 'cluster-sizes-plot-hdbscan',
-                    'elbow-plot'].forEach(elementId => {
-                        if (document.getElementById(elementId)) {
-                            Plotly.relayout(elementId, {
-                                'font.color': textColor,
-                                'paper_bgcolor': 'rgba(0,0,0,0)',
-                                'plot_bgcolor': 'rgba(0,0,0,0)'
-                            });
+                            color: pcaColors[cluster % pcaColors.length],
+                            size: 8,
+                            opacity: 0.7
                         }
                     });
+                });
+                
+                const layout = {
+                    title: title,
+                    xaxis: {
+                        title: 'PCA 1',
+                        zeroline: false,
+                        range: xRange,  // Set dynamic range
+                        autorange: false
+                    },
+                    yaxis: {
+                        title: 'PCA 2',
+                        zeroline: false,
+                        range: yRange,  // Set dynamic range
+                        autorange: false
+                    },
+                    hovermode: 'closest',
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: {
+                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                    },
+                    margin: {
+                        l: 50,
+                        r: 20,
+                        t: 50,
+                        b: 50
+                    },
+                    showlegend: clusters.length > 1  // Only show legend if multiple clusters
+                };
+                
+                Plotly.newPlot(elementId, traces, layout, {
+                    responsive: true,
+                    displayModeBar: true
+                });
+            } catch (error) {
+                console.error(`Error creating PCA plot ${elementId}:`, error);
+                const el = document.getElementById(elementId);
+                if (el) el.innerHTML = '<p class="text-red-500">Error loading visualization</p>';
+            }
+        }
+
+        function createClusterSizePlot(elementId, clusterSizes, title) {
+            try {
+                const container = document.getElementById(elementId);
+                if (!container) {
+                    console.error(`Plot container ${elementId} not found`);
+                    return;
                 }
-            {% endif %}
-        });
+
+                // Hide loading spinner
+                const loadingElement = container.querySelector('.plot-loading');
+                if (loadingElement) loadingElement.remove();
+
+                if (!clusterSizes || !clusterSizes.clusters || clusterSizes.clusters.length === 0) {
+                    container.innerHTML = '<p class="text-red-500">No cluster size data available</p>';
+                    return;
+                }
+
+                const pcaColors = [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5'
+                ];
+                
+                // Calculate dynamic y-axis range
+                const maxSize = Math.max(...clusterSizes.sizes);
+                const yRange = [0, maxSize * 1.1];
+                
+                const data = [{
+                    x: clusterSizes.clusters,
+                    y: clusterSizes.sizes,
+                    type: 'bar',
+                    marker: {
+                        color: clusterSizes.clusters.map(c => pcaColors[c % pcaColors.length])
+                    }
+                }];
+                
+                const layout = {
+                    title: title,
+                    xaxis: {
+                        title: 'Cluster',
+                        tickmode: 'array',
+                        tickvals: clusterSizes.clusters,
+                        ticktext: clusterSizes.clusters.map(c => `Cluster ${c}`)
+                    },
+                    yaxis: {
+                        title: 'Number of Visitors',
+                        range: yRange  // Set dynamic range
+                    },
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: {
+                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                    },
+                    margin: {
+                        l: 50,
+                        r: 20,
+                        t: 50,
+                        b: 50
+                    }
+                };
+                
+                Plotly.newPlot(elementId, data, layout, {
+                    responsive: true,
+                    displayModeBar: true
+                });
+            } catch (error) {
+                console.error(`Error creating cluster size plot ${elementId}:`, error);
+                const el = document.getElementById(elementId);
+                if (el) el.innerHTML = '<p class="text-red-500">Error loading visualization</p>';
+            }
+        }
+
+        function createElbowPlot(elementId, elbowData) {
+            try {
+                const container = document.getElementById(elementId);
+                if (!container) {
+                    console.error(`Plot container ${elementId} not found`);
+                    return;
+                }
+
+                // Hide loading spinner
+                const loadingElement = container.querySelector('.plot-loading');
+                if (loadingElement) loadingElement.remove();
+
+                if (!elbowData || !elbowData.k_values || elbowData.k_values.length === 0) {
+                    container.innerHTML = '<p class="text-red-500">No elbow data available</p>';
+                    return;
+                }
+
+                // Calculate dynamic y-axis range
+                const maxInertia = Math.max(...elbowData.inertias);
+                const minInertia = Math.min(...elbowData.inertias);
+                const yRange = [minInertia * 0.9, maxInertia * 1.1];
+                
+                const plotData = [{
+                    x: elbowData.k_values,
+                    y: elbowData.inertias,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: {
+                        color: '#3B82F6',
+                        width: 2
+                    },
+                    marker: {
+                        color: '#3B82F6',
+                        size: 8
+                    }
+                }];
+                
+                // Add a marker for the optimal k
+                plotData.push({
+                    x: [elbowData.optimal_k],
+                    y: [elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)]],
+                    type: 'scatter',
+                    mode: 'markers',
+                    marker: {
+                        color: '#EF4444',
+                        size: 12,
+                        symbol: 'circle',
+                        line: {
+                            color: '#FFFFFF',
+                            width: 2
+                        }
+                    },
+                    name: 'Optimal K'
+                });
+                
+                const layout = {
+                    title: 'Elbow Method For Optimal k',
+                    xaxis: {
+                        title: 'Number of clusters',
+                        tickmode: 'array',
+                        tickvals: elbowData.k_values,
+                        range: [Math.min(...elbowData.k_values)-0.5, Math.max(...elbowData.k_values)+0.5]
+                    },
+                    yaxis: {
+                        title: 'SSE (Sum of Squared Errors)',
+                        range: yRange
+                    },
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: {
+                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                    },
+                    margin: {
+                        l: 50,
+                        r: 20,
+                        t: 50,
+                        b: 50
+                    },
+                    annotations: [{
+                        x: elbowData.optimal_k,
+                        y: elbowData.inertias[elbowData.k_values.indexOf(elbowData.optimal_k)],
+                        xref: 'x',
+                        yref: 'y',
+                        text: 'Optimal K = ' + elbowData.optimal_k,
+                        showarrow: true,
+                        arrowhead: 2,
+                        ax: 0,
+                        ay: -40
+                    }]
+                };
+                
+                Plotly.newPlot(elementId, plotData, layout, {
+                    responsive: true,
+                    displayModeBar: true
+                });
+            } catch (error) {
+                console.error(`Error creating elbow plot ${elementId}:`, error);
+                const el = document.getElementById(elementId);
+                if (el) el.innerHTML = '<p class="text-red-500">Error loading visualization</p>';
+            }
+        }
+
+        function updatePlotThemes() {
+            try {
+                const textColor = document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151';
+                
+                // Update all plot containers
+                ['pca-plot-kmeans', 'pca-plot-hdbscan', 
+                 'cluster-sizes-plot-kmeans', 'cluster-sizes-plot-hdbscan',
+                 'elbow-plot'].forEach(elementId => {
+                    const plotDiv = document.getElementById(elementId);
+                    if (plotDiv && plotDiv._fullLayout) {  // Check if plot exists
+                        Plotly.relayout(elementId, {
+                            'font.color': textColor,
+                            'paper_bgcolor': 'rgba(0,0,0,0)',
+                            'plot_bgcolor': 'rgba(0,0,0,0)'
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating plot themes:', error);
+            }
+        }
+        {% endif %}
     </script>
 </body>
 </html>

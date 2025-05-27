@@ -257,14 +257,14 @@
                 }
             }
 
-            // Initialize theme
+            // Initialize theme to light by default
             const storedTheme = localStorage.getItem('theme');
-            const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            setTheme(storedTheme ? storedTheme === 'dark' : systemDark);
+            setTheme(storedTheme ? storedTheme === 'dark' : false);
 
             themeToggleBtn.addEventListener('click', () => {
                 setTheme(!document.documentElement.classList.contains('dark'));
             });
+
 
             // File upload functionality
             const form = document.getElementById('uploadForm');

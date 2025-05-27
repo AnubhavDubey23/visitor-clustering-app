@@ -16,7 +16,7 @@ from sklearn.metrics import silhouette_score
 def find_optimal_k(data, max_k=10):
     inertias = []
     for k in range(1, max_k + 1):
-        kmeans = KMeans(n_clusters=k, random_state=42)
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init='auto')
         kmeans.fit(data)
         inertias.append(kmeans.inertia_)
 
@@ -61,8 +61,8 @@ def process_file(input_path):
     df = pd.read_csv(input_path)
     df.columns = df.columns.str.strip()
 
-    df['device_data'] = df['Meta data (device data)'].apply(safe_json_parse)
-    df['network_data'] = df['Meta data (network data)'].apply(safe_json_parse)
+    df['device_data'] = df['meta data (device data)'].apply(safe_json_parse)
+    df['network_data'] = df['meta data (network data)'].apply(safe_json_parse)
 
     df['device_browser_details'] = df['device_data'].apply(lambda x: x.get('browser_details', np.nan))
     df['device_os'] = df['device_data'].apply(lambda x: x.get('os', np.nan))
@@ -82,25 +82,48 @@ def process_file(input_path):
 
     df['device_browser_details'] = df['device_browser_details'].apply(extract_browser_name)
 
-    visit_counts = df.groupby('Visitor id').size().reset_index(name='num_visits')
-    df = df.merge(visit_counts, on='Visitor id')
-    df['visitor_type'] = df['num_visits'].apply(lambda x: 'Returning' if x > 1 else 'New')
+    def build_features(df):
+        if 'Visitor id' in df.columns and df['Visitor id'].dropna().astype(str).str.strip().ne('').any():
+            df['user_key'] = 'visitor_' + df['Visitor id'].astype(str)
+            visit_counts = df['user_key'].value_counts().to_dict()
+            df['visit_count'] = df['user_key'].map(visit_counts)
+            df['visitor_type'] = df['visit_count'].apply(lambda x: 'Returning' if x > 1 else 'New')
+
+            features = ['network_org', 'State', 'device_browser_details', 'device_os', 'visitor_type', 'Product name']
+        else:
+            def get_user_key(row):
+                if 'Registered User Id' in df.columns and pd.notnull(row.get('Registered User Id')) and str(row['Registered User Id']).strip() != '':
+                    return f"reg_{row['Registered User Id']}"
+                elif 'Unregistered User Id' in df.columns and pd.notnull(row.get('Unregistered User Id')) and str(row['Unregistered User Id']).strip() != '':
+                    return f"unreg_{row['Unregistered User Id']}"
+                else:
+                    return 'unknown'
+            df['user_key'] = df.apply(get_user_key, axis=1)
+            user_counts = df['user_key'].value_counts().to_dict()
+            df['user_count'] = df['user_key'].map(user_counts)
+
+            features = ['city', 'network_org', 'device_browser_details', 'device_os', 'user_count']
+
+        return df, features
+
 
     df['device_os'] = df['device_os'].str.strip('"')
 
-    candidate_cols = ['network_org', 'State', 'device_browser_details', 'device_os', 'visitor_type','Product name']
-    features = select_strong_features(df, candidate_cols, top_n=5, threshold=0.5)
+    # candidate_cols = ['network_org', 'State', 'device_browser_details', 'device_os', 'visitor_type','Product name']
 
-    clustering_df = df[['Visitor id'] + features].copy()
+    df,features_2=build_features(df)
+    # features = select_strong_features(df, features_2, top_n=5, threshold=0.5)
+    features=features_2
+    clustering_df = df[features].copy()
 
-    for col in features:
+    for col in clustering_df.select_dtypes(include='object').columns:
         top_5 = clustering_df[col].value_counts().nlargest(5).index
         clustering_df[col] = clustering_df[col].apply(lambda x: x if x in top_5 else 'Other')
 
-
-    df_encoded = pd.get_dummies(df[features])
+    df_encoded = pd.get_dummies(clustering_df, drop_first=True).fillna(0)
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(df_encoded)
+
 
     # ==== KMeans ====
     optimal_k, inertias = find_optimal_k(scaled_data)
@@ -130,7 +153,7 @@ def process_file(input_path):
     plt.savefig(elbow_path, dpi=100, bbox_inches='tight')
     plt.close()
 
-    kmeans = KMeans(n_clusters=optimal_k, random_state=42)
+    kmeans = KMeans(n_clusters=optimal_k, random_state=42, n_init='auto')
     kmeans_labels = kmeans.fit_predict(scaled_data)
 
     # Compute silhouette score for KMeans
@@ -143,7 +166,7 @@ def process_file(input_path):
 
     # Compute silhouette score for HDBSCAN (only on non-noise points)
     mask = hdb_labels != -1
-    if mask.sum() > 1:  # need at least 2 samples to compute score
+    if len(set(hdb_labels[mask])) > 1:# need at least 2 samples to compute score
         silhouette_hdbscan = silhouette_score(scaled_data[mask], hdb_labels[mask])
     else:
         silhouette_hdbscan = None
@@ -153,7 +176,6 @@ def process_file(input_path):
     pca = PCA(n_components=2)
     pca_data = pca.fit_transform(scaled_data)
 
-    clustering_df = df[['Visitor id'] + features].copy()
     clustering_df['pca1'] = pca_data[:, 0]
     clustering_df['pca2'] = pca_data[:, 1]
     clustering_df['kmeans_cluster'] = kmeans_labels
@@ -208,13 +230,37 @@ def process_file(input_path):
         plt.xlabel("PCA 1")
         plt.ylabel("PCA 2")
         plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.3)
         plt.tight_layout()
         out_path = os.path.join(plot_dir, filename)
         plt.savefig(out_path)
         plt.close()
 
-    plot_pca('kmeans_cluster', 'KMeans PCA Plot', 'pca_plot_kmeans.png')
     plot_pca('hdbscan_cluster', 'HDBSCAN PCA Plot', 'pca_plot_hdbscan.png')
+
+    # ==== KMeans PCA Plot (Enhanced Style) ====
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(
+        clustering_df['pca1'],
+        clustering_df['pca2'],
+        c=clustering_df['kmeans_cluster'],
+        cmap='tab10',
+        s=50,
+        alpha=0.8,
+        edgecolors='w',
+        linewidth=0.5
+    )
+    plt.title('PCA of KMeans Visitor Clusters', fontsize=14)
+    plt.xlabel('PCA 1', fontsize=12)
+    plt.ylabel('PCA 2', fontsize=12)
+    cbar = plt.colorbar(scatter, ticks=range(optimal_k))
+    cbar.set_label('Cluster', fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.8)
+    plt.tight_layout()
+    kmeans_pca_path = os.path.join(plot_dir, 'pca_plot_kmeans.png')
+    plt.savefig(kmeans_pca_path, dpi=100)
+    plt.close()
+
 
     # ==== Cluster Summary ====
     RENAME_MAP = {
@@ -223,7 +269,10 @@ def process_file(input_path):
         'visitor_type': 'Visitor Type',
         'device_browser_details': 'Browser Used',
         'device_os': 'Type of Device',
-        'Product name': 'Name of Product'
+        'Product name': 'Name of Product',
+        'city':'City',
+        'age':'Year of Birth',
+
     }
 
     selected_renames = {col: RENAME_MAP[col] for col in features if col in RENAME_MAP}

@@ -56,6 +56,39 @@ def safe_json_parse(value):
         return json.loads(value.replace("'", '"'))
     except Exception:
         return {}
+    
+def process_rfm(df_rfm):
+    df_rfm['First visit date'] = pd.to_datetime(df_rfm['First visit date'], dayfirst=True)
+    df_rfm['Latest visit date'] = pd.to_datetime(df_rfm['Latest visit date'], dayfirst=True)
+
+    rfm_df = df_rfm.groupby('Visitor id').agg({
+        'Latest visit date': lambda x: (df_rfm['Latest visit date'].max() - x.max()).days,
+        'Visitor id': 'count'
+    }).rename(columns={
+        'Latest visit date': 'Recency',
+        'Visitor id': 'Frequency'
+    })
+    rfm_df['Monetary'] = rfm_df['Frequency']
+
+    rfm_df['R'] = pd.qcut(rfm_df['Recency'], 5, labels=[5, 4, 3, 2, 1]).astype(int)
+    rfm_df['F'] = pd.qcut(rfm_df['Frequency'].rank(method="first"), 5, labels=[1, 2, 3, 4, 5]).astype(int)
+    rfm_df['M'] = pd.qcut(rfm_df['Monetary'].rank(method="first"), 5, labels=[1, 2, 3, 4, 5]).astype(int)
+    rfm_df['RFM_Score'] = rfm_df['R'].astype(str) + rfm_df['F'].astype(str) + rfm_df['M'].astype(str)
+
+    def segment(rfm):
+        if rfm['R'] >= 4 and rfm['F'] >= 4:
+            return 'Champions'
+        elif rfm['R'] >= 3 and rfm['F'] >= 3:
+            return 'Loyal Customers'
+        elif rfm['R'] >= 4:
+            return 'Recent Customers'
+        elif rfm['F'] >= 4:
+            return 'Frequent Visitors'
+        else:
+            return 'Others'
+    
+    rfm_df['Segment'] = rfm_df.apply(segment, axis=1)
+    return rfm_df
 
 def process_file(input_path):
     df = pd.read_csv(input_path)
@@ -89,7 +122,14 @@ def process_file(input_path):
             df['visit_count'] = df['user_key'].map(visit_counts)
             df['visitor_type'] = df['visit_count'].apply(lambda x: 'Returning' if x > 1 else 'New')
 
+            rfm_df=process_rfm(df)
+
             features = ['network_org', 'State', 'device_browser_details', 'device_os', 'visitor_type', 'Product name']
+
+            df = df.merge(rfm_df[['Recency', 'Frequency', 'Monetary', 'R', 'F', 'M', 'RFM_Score', 'Segment']],
+                              left_on='Visitor id', right_index=True, how='left')
+
+            features += ['RFM_Score']
         else:
             def get_user_key(row):
                 if 'Registered User Id' in df.columns and pd.notnull(row.get('Registered User Id')) and str(row['Registered User Id']).strip() != '':

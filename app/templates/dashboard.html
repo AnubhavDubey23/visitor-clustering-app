@@ -86,6 +86,17 @@
     </div>
 </div>
 
+<!-- RFM Score Distribution -->
+{% if rfm_score_distribution %}
+<div class="bg-white rounded-lg shadow-md p-6 col-span-1 md:col-span-2">
+    <h3 class="text-lg font-semibold text-gray-700 mb-4">RFM Score Distribution</h3>
+    <img src="{{ url_for('static', filename='plots/rfm_score_distribution.png') }}" alt="RFM Score Distribution" class="w-full h-auto rounded">
+    <p class="text-sm text-gray-600 mt-2">
+        Distribution of customer segments based on Recency, Frequency, and Monetary scores.
+    </p>
+</div>
+{% endif %}
+
 <div class="bg-white rounded-lg shadow-md p-6 mb-8">
     <h3 class="text-xl font-semibold text-gray-700 mb-4">KMeans Cluster Summary</h3>
     {% if summary.kmeans|length > 0 %}

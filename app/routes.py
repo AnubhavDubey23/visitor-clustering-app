@@ -18,6 +18,14 @@ def index():
             APP_FOLDER = os.path.dirname(os.path.abspath(__file__))
             output_path = os.path.join(APP_FOLDER, 'outputs', 'clustered_visitors_combined.csv')
 
+            # Initialize variables with default values
+            pca_data = {'kmeans': [], 'hdbscan': []}
+            cluster_sizes = {'kmeans': {'clusters': [], 'sizes': []}, 'hdbscan': {'clusters': [], 'sizes': []}}
+            elbow_data = {'k_values': [], 'inertias': [], 'optimal_k': 0}
+            show_rfm = False
+            rfm_scores = []
+            rfm_counts = []
+
             if os.path.exists(output_path):
                 df = pd.read_csv(output_path)
 
@@ -32,17 +40,6 @@ def index():
                 }
 
                 # Cluster sizes
-                cluster_sizes = {
-                    'kmeans': {
-                        'clusters': [],
-                        'sizes': []
-                    },
-                    'hdbscan': {
-                        'clusters': [],
-                        'sizes': []
-                    }
-                }
-
                 if 'kmeans_cluster' in df.columns:
                     kmeans_counts = df['kmeans_cluster'].value_counts().sort_index()
                     cluster_sizes['kmeans']['clusters'] = kmeans_counts.index.tolist()
@@ -59,22 +56,33 @@ def index():
                     'optimal_k': int(summary.get('optimal_k', 2))
                 }
 
-                return render_template(
-                    'index.html',
-                    plots=True,
-                    summary_kmeans=summary.get('summary_kmeans', []),
-                    summary_hdbscan=summary.get('summary_hdbscan', []),
-                    pca_data=pca_data,
-                    cluster_sizes=cluster_sizes,
-                    elbow_data=elbow_data,
-                    pca_plot_kmeans=summary['pca_plot_kmeans'],
-                    pca_plot_hdbscan=summary['pca_plot_hdbscan'],
-                    cluster_sizes_kmeans=summary['cluster_sizes_kmeans'],
-                    cluster_sizes_hdbscan=summary['cluster_sizes_hdbscan'],
-                    elbow_plot=summary['elbow_plot'],
-                    silhouette_kmeans=summary.get('silhouette_kmeans'),
-                    silhouette_hdbscan=summary.get('silhouette_hdbscan')
-                )
+                # RFM data - only if column exists
+                if 'RFM_Score' in df.columns:
+                    rfm_score_counts = df['RFM_Score'].value_counts()
+                    rfm_scores = rfm_score_counts.index.tolist()
+                    rfm_counts = rfm_score_counts.values.tolist()
+                    show_rfm = len(rfm_scores) > 0  # Only show if we have scores
+
+            return render_template(
+                'index.html',
+                plots=True,
+                show_rfm=show_rfm,
+                summary_kmeans=summary.get('summary_kmeans', []),
+                summary_hdbscan=summary.get('summary_hdbscan', []),
+                pca_data=pca_data,
+                cluster_sizes=cluster_sizes,
+                elbow_data=elbow_data,
+                pca_plot_kmeans=summary['pca_plot_kmeans'],
+                pca_plot_hdbscan=summary['pca_plot_hdbscan'],
+                cluster_sizes_kmeans=summary['cluster_sizes_kmeans'],
+                cluster_sizes_hdbscan=summary['cluster_sizes_hdbscan'],
+                elbow_plot=summary['elbow_plot'],
+                rfm_score_distribution=summary.get('rfm_score_distribution'),
+                rfm_scores=rfm_scores,
+                rfm_counts=rfm_counts,
+                silhouette_kmeans=summary.get('silhouette_kmeans'),
+                silhouette_hdbscan=summary.get('silhouette_hdbscan')
+            )
 
     return render_template('index.html', plots=False)
 

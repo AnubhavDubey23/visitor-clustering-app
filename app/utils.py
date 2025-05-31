@@ -70,10 +70,32 @@ def process_rfm(df_rfm):
     })
     rfm_df['Monetary'] = rfm_df['Frequency']
 
+    # Debug print raw values before binning
+    print("\nRecency values before binning:")
+    print(rfm_df['Recency'].describe())
+    
+    print("\nFrequency values before binning:")
+    print(rfm_df['Frequency'].describe())
+
     rfm_df['R'] = pd.qcut(rfm_df['Recency'], 5, labels=[5, 4, 3, 2, 1]).astype(int)
     rfm_df['F'] = pd.qcut(rfm_df['Frequency'].rank(method="first"), 5, labels=[1, 2, 3, 4, 5]).astype(int)
     rfm_df['M'] = pd.qcut(rfm_df['Monetary'].rank(method="first"), 5, labels=[1, 2, 3, 4, 5]).astype(int)
+
+    # Debug print after binning
+    print("\nR scores distribution:")
+    print(rfm_df['R'].value_counts().sort_index())
+    
+    print("\nF scores distribution:")
+    print(rfm_df['F'].value_counts().sort_index())
+    
+    print("\nM scores distribution:")
+    print(rfm_df['M'].value_counts().sort_index())
+
     rfm_df['RFM_Score'] = rfm_df['R'].astype(str) + rfm_df['F'].astype(str) + rfm_df['M'].astype(str)
+
+    print("\nRFM Score distribution:")
+    print(rfm_df['RFM_Score'].value_counts().head(20))
+
 
     def segment(rfm):
         if rfm['R'] >= 4 and rfm['F'] >= 4:
@@ -115,6 +137,10 @@ def process_file(input_path):
 
     df['device_browser_details'] = df['device_browser_details'].apply(extract_browser_name)
 
+    APP_FOLDER = os.path.dirname(os.path.abspath(__file__))
+    plot_dir = os.path.join(APP_FOLDER, '..', 'static', 'plots')
+    os.makedirs(plot_dir, exist_ok=True)
+
     def build_features(df):
         if 'Visitor id' in df.columns and df['Visitor id'].dropna().astype(str).str.strip().ne('').any():
             df['user_key'] = 'visitor_' + df['Visitor id'].astype(str)
@@ -130,6 +156,15 @@ def process_file(input_path):
                               left_on='Visitor id', right_index=True, how='left')
 
             features += ['RFM_Score']
+            # ===== ADD RFM SCORE DISTRIBUTION PLOT =====
+            plt.figure(figsize=(12,6))
+            rfm_df['RFM_Score'].value_counts().sort_index().plot(kind='bar', color='skyblue')
+            plt.title('RFM Score Distribution')
+            plt.xlabel('RFM Score')
+            plt.ylabel('Number of Customers')
+            rfm_plot_path = os.path.join(plot_dir, 'rfm_score_distribution.png')
+            plt.savefig(rfm_plot_path)
+            plt.close()
         else:
             def get_user_key(row):
                 if 'Registered User Id' in df.columns and pd.notnull(row.get('Registered User Id')) and str(row['Registered User Id']).strip() != '':
@@ -151,9 +186,8 @@ def process_file(input_path):
 
     # candidate_cols = ['network_org', 'State', 'device_browser_details', 'device_os', 'visitor_type','Product name']
 
-    df,features_2=build_features(df)
+    df,features=build_features(df)
     # features = select_strong_features(df, features_2, top_n=5, threshold=0.5)
-    features=features_2
     clustering_df = df[features].copy()
 
     for col in clustering_df.select_dtypes(include='object').columns:
@@ -168,9 +202,6 @@ def process_file(input_path):
     # ==== KMeans ====
     optimal_k, inertias = find_optimal_k(scaled_data)
 
-    APP_FOLDER = os.path.dirname(os.path.abspath(__file__))
-    plot_dir = os.path.join(APP_FOLDER, '..', 'static', 'plots')
-    os.makedirs(plot_dir, exist_ok=True)
 
     # Create plots with improved styling
     plt.figure(figsize=(10, 6))
@@ -340,6 +371,7 @@ def process_file(input_path):
         'pca_plot_hdbscan': 'plots/pca_plot_hdbscan.png',
         'cluster_sizes_kmeans': 'plots/cluster_sizes_kmeans.png',
         'cluster_sizes_hdbscan': 'plots/cluster_sizes_hdbscan.png',
+        'rfm_score_distribution': 'plots/rfm_score_distribution.png', 
         'silhouette_kmeans': silhouette_kmeans,
         'silhouette_hdbscan': silhouette_hdbscan,
         'optimal_k': optimal_k,

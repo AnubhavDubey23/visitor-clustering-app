@@ -117,6 +117,23 @@
                     </div>
                 </div>
 
+                {% if show_rfm %}
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl col-span-1 md:col-span-2">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">RFM Score Distribution</h3>
+                    <div id="rfm-plot" class="w-full h-64 md:h-80 relative">
+                        <div class="plot-loading absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                            <div class="spinner"></div>
+                        </div>
+                        {% if rfm_score_distribution and not show_rfm %}
+                        <img src="{{ url_for('static', filename=rfm_score_distribution) }}" alt="RFM Score Distribution" class="hidden w-full h-full object-contain">
+                        {% endif %}
+                    </div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                        Shows the distribution of Recency, Frequency, Monetary scores for identified customer segments.
+                    </p>
+                </div>
+                {% endif %}
+
                 <!-- Silhouette Scores -->
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-all duration-200 hover:shadow-xl col-span-1 md:col-span-2">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Silhouette Scores</h3>
@@ -349,13 +366,37 @@
                 await loadPlotly();
                 
                 // Create plots with error handling
-                await Promise.all([
+                const plotPromises = [
                     createPcaPlot('pca-plot-kmeans', {{ pca_data.kmeans|tojson }}, 'KMeans PCA Visualization'),
                     createPcaPlot('pca-plot-hdbscan', {{ pca_data.hdbscan|tojson }}, 'HDBSCAN PCA Visualization'),
                     createClusterSizePlot('cluster-sizes-plot-kmeans', {{ cluster_sizes.kmeans|tojson }}, 'KMeans Cluster Distribution'),
                     createClusterSizePlot('cluster-sizes-plot-hdbscan', {{ cluster_sizes.hdbscan|tojson }}, 'HDBSCAN Cluster Distribution'),
                     createElbowPlot('elbow-plot', {{ elbow_data|tojson }})
-                ]);
+                ];
+                
+                // RFM Plot Handling - Improved Version
+                {% if show_rfm or (rfm_score_distribution) %}
+                    const rfmContainer = document.getElementById('rfm-plot');
+                    if (rfmContainer) {
+                        // Check if we have both scores and counts
+                        if ({{ rfm_scores|tojson|default('[]') }}.length > 0 && {{ rfm_counts|tojson|default('[]') }}.length > 0) {
+                            plotPromises.push(
+                                createRfmPlot(
+                                    'rfm-plot', 
+                                    {{ rfm_scores|tojson }}, 
+                                    {{ rfm_counts|tojson }}
+                                )
+                            );
+                        }
+                        // Fallback to static image if available
+                        else if ({{ rfm_score_distribution|tojson|default('null') }} !== null) {
+                            const img = rfmContainer.querySelector('img');
+                            if (img) img.classList.remove('hidden');
+                        }
+                    }
+                {% endif %}
+            
+                await Promise.all(plotPromises);
                 
                 // Set up theme switching after plots are created
                 const themeToggle = document.getElementById('theme-toggle');
@@ -370,6 +411,91 @@
             }
         }
 
+        // New function for RFM Score Distribution plot
+        function createRfmPlot(elementId, rfmScores,rfmCounts) {
+            try {
+                const container = document.getElementById(elementId);
+                if (!container) {
+                    console.error(`Plot container ${elementId} not found`);
+                    return;
+                }
+
+                // Hide loading spinner if exists
+                const loadingElement = container.querySelector('.plot-loading');
+                if (loadingElement) loadingElement.remove();
+
+                if (!rfmScores || rfmScores.length === 0) {
+                    // If no RFM data, show the static image instead
+                    const imgElement = container.querySelector('img');
+                    if (imgElement) {
+                        imgElement.classList.remove('hidden');
+                    }
+                    return;
+                }
+
+                // Process RFM scores data
+                const scoreCounts = {};
+                rfmScores.forEach(score => {
+                    scoreCounts[score] = (scoreCounts[score] || 0) + 1;
+                });
+
+                const sortedScores = Object.keys(scoreCounts).sort();
+                const counts = sortedScores.map(score => scoreCounts[score]);
+
+                const data = [{
+                    x: rfmScores,
+                    y: rfmCounts,  // Use the pre-calculated counts
+                    type: 'bar',
+                    marker: {
+                        color: '#4F46E5',  // Indigo-600
+                        opacity: 0.8,
+                        line: {
+                            color: document.documentElement.classList.contains('dark') ? '#1F2937' : '#E5E7EB',
+                            width: 1
+                        }
+                    }
+                }];
+
+                const layout = {
+                    title: 'RFM Score Distribution',
+                    xaxis: {
+                        title: 'RFM Score',
+                        type: 'category',
+                        tickangle: -45
+                    },
+                    yaxis: {
+                        title: 'Number of Customers'
+                    },
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: {
+                        color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                    },
+                    margin: {
+                        l: 50,
+                        r: 20,
+                        t: 50,
+                        b: 100  // Extra space for rotated labels
+                    },
+                    hovermode: 'closest'
+                };
+
+                Plotly.newPlot(elementId, data, layout, {
+                    responsive: true,
+                    displayModeBar: true
+                });
+            } catch (error) {
+                console.error(`Error creating RFM plot ${elementId}:`, error);
+                // Fallback to static image if available
+                const imgElement = document.getElementById(elementId)?.querySelector('img');
+                if (imgElement) {
+                    imgElement.classList.remove('hidden');
+                } else {
+                    const el = document.getElementById(elementId);
+                    if (el) el.innerHTML = '<p class="text-red-500">Error loading visualization</p>';
+                }
+            }
+        }
         function createPcaPlot(elementId, pcaData, title) {
             try {
                 const container = document.getElementById(elementId);
@@ -633,18 +759,28 @@
         function updatePlotThemes() {
             try {
                 const textColor = document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151';
+                const bgColor = document.documentElement.classList.contains('dark') ? '#1F2937' : '#F3F4F6';
                 
                 // Update all plot containers
                 ['pca-plot-kmeans', 'pca-plot-hdbscan', 
                  'cluster-sizes-plot-kmeans', 'cluster-sizes-plot-hdbscan',
-                 'elbow-plot'].forEach(elementId => {
+                 'elbow-plot','rfm-plot'].forEach(elementId => {
                     const plotDiv = document.getElementById(elementId);
                     if (plotDiv && plotDiv._fullLayout) {  // Check if plot exists
                         Plotly.relayout(elementId, {
                             'font.color': textColor,
                             'paper_bgcolor': 'rgba(0,0,0,0)',
-                            'plot_bgcolor': 'rgba(0,0,0,0)'
+                            'plot_bgcolor': 'rgba(0,0,0,0)',
+                            'xaxis.gridcolor': document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB',
+                            'yaxis.gridcolor': document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
                         });
+
+                        // Special handling for bar plots (RFM and cluster sizes)
+                        if (elementId === 'rfm-plot' || elementId.includes('cluster-sizes')) {
+                            Plotly.restyle(elementId, {
+                                'marker.line.color': [document.documentElement.classList.contains('dark') ? '#1F2937' : '#E5E7EB']
+                            });
+                        }
                     }
                 });
             } catch (error) {

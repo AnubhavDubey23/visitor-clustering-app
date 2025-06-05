@@ -77,6 +77,17 @@ def send_email_to_low_recency_users(clustering_df, top_n=10):
         print("No 'email' column found in clustering_df. Cannot send emails.")
         return
 
+    # Get SMTP configuration
+    smtp_server = os.getenv('SMTP_SERVER')
+    smtp_port = int(os.getenv('SMTP_PORT', 587))
+    smtp_user = os.getenv('SMTP_USER')
+    smtp_password = os.getenv('SMTP_PASSWORD')
+    
+    # Verify all required SMTP settings are present
+    if not all([smtp_server, smtp_user, smtp_password]):
+        print("Missing required SMTP configuration. Cannot send emails.")
+        return
+
     inactive_users = clustering_df.sort_values(by='Recency', ascending=False).head(top_n)
     inactive_emails = inactive_users['Email'].dropna().unique()
 
@@ -84,40 +95,42 @@ def send_email_to_low_recency_users(clustering_df, top_n=10):
         print("No valid emails found to send notifications.")
         return
 
-    smtp_server = os.getenv('SMTP_SERVER')
-    smtp_port = int(os.getenv('SMTP_PORT', 587))
-    smtp_user = os.getenv('SMTP_USER')
-    smtp_password = os.getenv('SMTP_PASSWORD')
     sender_email = smtp_user
     subject = "We Miss You at Our Platform!"
 
-    for recipient in inactive_emails:
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = recipient
-        msg['Subject'] = subject
+    try:
+        # Establish SMTP connection once for all emails
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.connect(smtp_server, smtp_port)  # Explicit connection
+            server.ehlo()  # Identify yourself to the server
+            server.starttls()  # Secure the connection
+            server.ehlo()  # Re-identify after TLS
+            server.login(smtp_user, smtp_password)
+            
+            for recipient in inactive_emails:
+                msg = MIMEMultipart()
+                msg['From'] = sender_email
+                msg['To'] = recipient
+                msg['Subject'] = subject
 
-        body = f"""
-        Hi there,
+                body = f"""
+                Hi there,
 
-        We've noticed it's been a while since your last visit. 
-        We’d love to have you back! Check out what’s new and exciting on our platform.
+                We've noticed it's been a while since your last visit. 
+                We'd love to have you back! Check out what's new and exciting on our platform.
 
-        Visit us again soon!
+                Visit us again soon!
 
-        Best,
-        Your Team
-        """
-        msg.attach(MIMEText(body, 'plain'))
-
-        try:
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
+                Best,
+                Your Team
+                """
+                msg.attach(MIMEText(body, 'plain'))
+                
                 server.send_message(msg)
                 print(f"Email sent to: {recipient}")
-        except Exception as e:
-            print(f"Failed to send email to {recipient}: {e}")
+                
+    except Exception as e:
+        print(f"SMTP Error: {str(e)}")
     
 def process_rfm(df_rfm):
     df_rfm['First visit date'] = pd.to_datetime(df_rfm['First visit date'], dayfirst=True)

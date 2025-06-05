@@ -11,7 +11,14 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import hdbscan
 from sklearn.metrics import silhouette_score
-
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+import os
+load_dotenv()
+# SMTP_USER = os.getenv("SMTP_USER")
+# SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 def find_optimal_k(data, max_k=10):
     inertias = []
@@ -57,16 +64,73 @@ def safe_json_parse(value):
     except Exception:
         return {}
     
+def send_email_to_low_recency_users(clustering_df, top_n=10):
+    """
+    Sends an email to users with the lowest recency values (most inactive).
+    Requires an 'email' column in clustering_df.
+
+    Parameters:
+    - clustering_df: pd.DataFrame with clustering results and RFM data
+    - top_n: Number of users with lowest recency to email
+    """
+    if 'Email' not in clustering_df.columns:
+        print("No 'email' column found in clustering_df. Cannot send emails.")
+        return
+
+    inactive_users = clustering_df.sort_values(by='Recency', ascending=False).head(top_n)
+    inactive_emails = inactive_users['Email'].dropna().unique()
+
+    if len(inactive_emails) == 0:
+        print("No valid emails found to send notifications.")
+        return
+
+    smtp_server = os.getenv('SMTP_SERVER')
+    smtp_port = int(os.getenv('SMTP_PORT', 587))
+    smtp_user = os.getenv('SMTP_USER')
+    smtp_password = os.getenv('SMTP_PASSWORD')
+    sender_email = smtp_user
+    subject = "We Miss You at Our Platform!"
+
+    for recipient in inactive_emails:
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient
+        msg['Subject'] = subject
+
+        body = f"""
+        Hi there,
+
+        We've noticed it's been a while since your last visit. 
+        We’d love to have you back! Check out what’s new and exciting on our platform.
+
+        Visit us again soon!
+
+        Best,
+        Your Team
+        """
+        msg.attach(MIMEText(body, 'plain'))
+
+        try:
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+                print(f"Email sent to: {recipient}")
+        except Exception as e:
+            print(f"Failed to send email to {recipient}: {e}")
+    
 def process_rfm(df_rfm):
     df_rfm['First visit date'] = pd.to_datetime(df_rfm['First visit date'], dayfirst=True)
     df_rfm['Latest visit date'] = pd.to_datetime(df_rfm['Latest visit date'], dayfirst=True)
 
     rfm_df = df_rfm.groupby('Visitor id').agg({
         'Latest visit date': lambda x: (df_rfm['Latest visit date'].max() - x.max()).days,
-        'Visitor id': 'count'
+        'Visitor id': 'count',
+        'Email': 'first'
     }).rename(columns={
         'Latest visit date': 'Recency',
-        'Visitor id': 'Frequency'
+        'Visitor id': 'Frequency',
+        'Email': 'Email'
     })
     rfm_df['Monetary'] = rfm_df['Frequency']
 
@@ -95,6 +159,8 @@ def process_rfm(df_rfm):
 
     print("\nRFM Score distribution:")
     print(rfm_df['RFM_Score'].value_counts().head(20))
+
+    
 
 
     def segment(rfm):
@@ -149,6 +215,8 @@ def process_file(input_path):
             df['visitor_type'] = df['visit_count'].apply(lambda x: 'Returning' if x > 1 else 'New')
 
             rfm_df=process_rfm(df)
+
+            send_email_to_low_recency_users(rfm_df, top_n=10)
 
             features = ['network_org', 'State', 'device_browser_details', 'device_os', 'visitor_type', 'Product name']
 

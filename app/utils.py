@@ -10,15 +10,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import hdbscan
+import requests
 from sklearn.metrics import silhouette_score
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv
 import os
-load_dotenv()
-# SMTP_USER = os.getenv("SMTP_USER")
-# SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 def find_optimal_k(data, max_k=10):
     inertias = []
@@ -62,76 +56,27 @@ def safe_json_parse(value):
     try:
         return json.loads(value.replace("'", '"'))
     except Exception:
-        return {}
-    
-def send_email_to_low_recency_users(clustering_df, top_n=10):
-    """
-    Sends an email to users with the lowest recency values (most inactive).
-    Requires an 'email' column in clustering_df.
+        return {}    
 
-    Parameters:
-    - clustering_df: pd.DataFrame with clustering results and RFM data
-    - top_n: Number of users with lowest recency to email
-    """
-    if 'Email' not in clustering_df.columns:
-        print("No 'email' column found in clustering_df. Cannot send emails.")
-        return
+def notify_low_recency_users(rfm_df):
+    webhook_url = "https://hook.eu2.make.com/3jdqmukqu5096k1y1ghh0vhbn7iso3fp"  # Replace with your real URL
 
-    # Get SMTP configuration
-    smtp_server = os.getenv('SMTP_SERVER')
-    smtp_port = int(os.getenv('SMTP_PORT', 587))
-    smtp_user = os.getenv('SMTP_USER')
-    smtp_password = os.getenv('SMTP_PASSWORD')
-    
-    # Verify all required SMTP settings are present
-    if not all([smtp_server, smtp_user, smtp_password]):
-        print("Missing required SMTP configuration. Cannot send emails.")
-        return
+    for _, row in rfm_df.iterrows():
+        recency = row.get("Recency", 999)
+        email = row.get("email") or row.get("Email")  # Adjust based on your column name
 
-    inactive_users = clustering_df.sort_values(by='Recency', ascending=False).head(top_n)
-    inactive_emails = inactive_users['Email'].dropna().unique()
+        if pd.notnull(email) and recency < 20:
+            payload = {
+                "email": email,
+                "recency": recency
+            }
+            try:
+                response = requests.post(webhook_url, json=payload)
+                response.raise_for_status()
+                print(f"✅ Notification sent to {email}")
+            except Exception as e:
+                print(f"❌ Failed to notify {email}: {str(e)}")
 
-    if len(inactive_emails) == 0:
-        print("No valid emails found to send notifications.")
-        return
-
-    sender_email = smtp_user
-    subject = "We Miss You at Our Platform!"
-
-    try:
-        # Establish SMTP connection once for all emails
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.connect(smtp_server, smtp_port)  # Explicit connection
-            server.ehlo()  # Identify yourself to the server
-            server.starttls()  # Secure the connection
-            server.ehlo()  # Re-identify after TLS
-            server.login(smtp_user, smtp_password)
-            
-            for recipient in inactive_emails:
-                msg = MIMEMultipart()
-                msg['From'] = sender_email
-                msg['To'] = recipient
-                msg['Subject'] = subject
-
-                body = f"""
-                Hi there,
-
-                We've noticed it's been a while since your last visit. 
-                We'd love to have you back! Check out what's new and exciting on our platform.
-
-                Visit us again soon!
-
-                Best,
-                Your Team
-                """
-                msg.attach(MIMEText(body, 'plain'))
-                
-                server.send_message(msg)
-                print(f"Email sent to: {recipient}")
-                
-    except Exception as e:
-        print(f"SMTP Error: {str(e)}")
-    
 def process_rfm(df_rfm):
     df_rfm['First visit date'] = pd.to_datetime(df_rfm['First visit date'], dayfirst=True)
     df_rfm['Latest visit date'] = pd.to_datetime(df_rfm['Latest visit date'], dayfirst=True)
@@ -172,9 +117,6 @@ def process_rfm(df_rfm):
 
     print("\nRFM Score distribution:")
     print(rfm_df['RFM_Score'].value_counts().head(20))
-
-    
-
 
     def segment(rfm):
         if rfm['R'] >= 4 and rfm['F'] >= 4:
@@ -229,7 +171,10 @@ def process_file(input_path):
 
             rfm_df=process_rfm(df)
 
-            send_email_to_low_recency_users(rfm_df, top_n=10)
+            # send_email_to_low_recency_users(rfm_df)
+            # After RFM calculation is done and RFM dataframe is ready
+            notify_low_recency_users(rfm_df)
+
 
             features = ['network_org', 'State', 'device_browser_details', 'device_os', 'visitor_type', 'Product name']
 
@@ -332,23 +277,6 @@ def process_file(input_path):
     clustering_df['pca2'] = pca_data[:, 1]
     clustering_df['kmeans_cluster'] = kmeans_labels
     clustering_df['hdbscan_cluster'] = hdb_labels
-
-    # APP_FOLDER = os.path.dirname(os.path.abspath(__file__))
-    # plot_dir = os.path.join(APP_FOLDER, '..', 'static', 'plots')
-    # os.makedirs(plot_dir, exist_ok=True)
-
-    # # ==== Elbow Plot ====
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(range(1, 11), inertias, marker='o', linestyle='-', color='#3B82F6')
-    # plt.scatter(optimal_k, inertias[optimal_k - 1], s=200, c='#EF4444', edgecolors='white', linewidth=2)
-    # plt.title("Elbow Method For Optimal k")
-    # plt.xlabel("Number of clusters")
-    # plt.ylabel("SSE")
-    # plt.grid(True, linestyle='--', alpha=0.7)
-    # plt.tight_layout()
-    # elbow_path = os.path.join(plot_dir, 'elbow_plot.png')
-    # plt.savefig(elbow_path)
-    # plt.close()
 
     # ==== Cluster Size Bar Plot ====
     def plot_cluster_sizes(cluster_col, title, filename):

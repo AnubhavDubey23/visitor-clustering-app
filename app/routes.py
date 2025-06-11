@@ -5,7 +5,6 @@ from .utils import process_file
 
 main = Blueprint('main', __name__)
 
-
 @main.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -99,7 +98,6 @@ def download_results():
                          as_attachment=True)
     else:
         return "No results file available. Please process data first.", 404
-
 
 @main.route('/api/cluster-data', methods=['GET'])
 def get_cluster_data():
